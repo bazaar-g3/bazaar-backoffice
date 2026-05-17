@@ -1,0 +1,144 @@
+import { NavLink, useNavigate } from 'react-router-dom'
+import { COLORS } from '../constants/colors'
+
+const NAV_ITEMS = [
+  { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { path: '/users', label: 'Usuarios', icon: '👥' },
+  { path: '/products', label: 'Productos', icon: '📦' },
+  { path: '/orders', label: 'Órdenes', icon: '🧾' },
+]
+
+export default function Layout({ children }) {
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    localStorage.removeItem('token')
+    navigate('/login')
+  }
+
+  return (
+    <div style={styles.shell}>
+      {/* Sidebar */}
+      <aside style={styles.sidebar}>
+        {/* Logo */}
+        <div style={styles.logoArea}>
+          <span style={styles.logoIcon}>🗂️</span>
+          <div>
+            <div style={styles.logoTitle}>BAZAAR</div>
+            <div style={styles.logoSub}>Backoffice Admin</div>
+          </div>
+        </div>
+
+        {/* Nav */}
+        <nav style={styles.nav}>
+          {NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              style={({ isActive }) => ({
+                ...styles.navItem,
+                backgroundColor: isActive ? COLORS.primary : 'transparent',
+                color: isActive ? COLORS.white : '#94a3b8',
+              })}
+            >
+              <span style={styles.navIcon}>{item.icon}</span>
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Logout */}
+        <button style={styles.logoutBtn} onClick={handleLogout}>
+          <span>🚪</span>
+          <span>Cerrar sesión</span>
+        </button>
+      </aside>
+
+      {/* Main content */}
+      <main style={styles.main}>
+        {children}
+      </main>
+    </div>
+  )
+}
+
+const styles = {
+  shell: {
+    display: 'flex',
+    height: '100vh',
+    overflow: 'hidden',
+  },
+  sidebar: {
+    width: 240,
+    minWidth: 240,
+    backgroundColor: COLORS.sidebar,
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '0 0 16px 0',
+    overflow: 'hidden',
+  },
+  logoArea: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '24px 20px 20px',
+    borderBottom: '1px solid #1e293b',
+    marginBottom: 12,
+  },
+  logoIcon: {
+    fontSize: 28,
+  },
+  logoTitle: {
+    fontSize: 16,
+    fontWeight: 800,
+    color: COLORS.white,
+    letterSpacing: 1,
+  },
+  logoSub: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: 500,
+  },
+  nav: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+    padding: '0 10px',
+  },
+  navItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '10px 14px',
+    borderRadius: 8,
+    fontSize: 14,
+    fontWeight: 600,
+    transition: 'all 0.15s',
+    textDecoration: 'none',
+  },
+  navIcon: {
+    fontSize: 16,
+    width: 20,
+    textAlign: 'center',
+  },
+  logoutBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    margin: '0 10px',
+    padding: '10px 14px',
+    borderRadius: 8,
+    border: 'none',
+    backgroundColor: 'transparent',
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  main: {
+    flex: 1,
+    overflow: 'auto',
+    backgroundColor: COLORS.background,
+  },
+}
