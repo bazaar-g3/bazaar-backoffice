@@ -1,35 +1,149 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
 
+/** Cantidad de usuarios por página en el listado. */
+const PAGE_SIZE = 20
+
+/**
+ * Opciones disponibles para el filtro de rol.
+ * El valor vacío `''` representa "sin filtro" (muestra todos los usuarios).
+ *
+ * @type {Array<{ value: string, label: string }>}
+ */
+const ROLE_FILTERS = [
+  { value: '',      label: 'Todos'    },
+  { value: 'user',  label: 'Usuarios' },
+  { value: 'admin', label: 'Admins'   },
+]
+
+/**
+ * Página de gestión de usuarios del panel de administración.
+ *
+ * Presenta una tabla paginada de todos los usuarios registrados en el sistema,
+ * con las siguientes capacidades:
+ * - Búsqueda por nombre o email con debounce de 400 ms para evitar llamadas excesivas a la API.
+ * - Filtro de rol (Todos / Usuarios / Admins) mediante pills de selección.
+ * - Acciones de bloqueo y desbloqueo por usuario (con protección para no bloquear admins).
+ * - Toast de advertencia auto-descartable cuando se intenta bloquear un administrador.
+ * - Paginación con ellipsis para conjuntos grandes de páginas.
+ *
+ * La búsqueda y el filtro se procesan en el servidor. Al cambiar cualquier filtro se resetea
+ * la página a 1 para evitar mostrar una página vacía.
+ *
+ * @returns {JSX.Element} Vista completa de gestión de usuarios con tabla, filtros y paginación.
+ */
 export default function Users() {
   const [users, setUsers] = useState([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
-  const [actionLoading, setActionLoading] = useState(null) // user id being toggled
+  const [actionLoading, setActionLoading] = useState(null)
+  const [warning, setWarning] = useState('')
+  const debounceTimer = useRef(null)
+  const warningTimer = useRef(null)
 
+  /**
+   * Maneja cambios en el campo de búsqueda con debounce de 400 ms.
+   *
+   * Actualiza inmediatamente el valor visible del input (`search`) y resetea la página a 1.
+   * La búsqueda efectiva contra la API (`debouncedSearch`) se actualiza solo 400 ms
+   * después de que el usuario deja de escribir, evitando requests innecesarios.
+   *
+   * @param {string} value - Nuevo valor del campo de búsqueda.
+   */
+  function handleSearchChange(value) {
+    setSearch(value)
+    setPage(1)
+    clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => setDebouncedSearch(value), 400)
+  }
+
+  /**
+   * Actualiza el filtro de rol activo y resetea la paginación a la primera página.
+   *
+   * @param {string} value - Valor del filtro seleccionado: `''` (todos), `'user'` o `'admin'`.
+   */
+  function handleRoleChange(value) {
+    setRoleFilter(value)
+    setPage(1)
+  }
+
+  /**
+   * Muestra un toast de advertencia en la parte superior de la pantalla.
+   *
+   * El toast se descarta automáticamente después de 3.5 segundos.
+   * Reinicia el timer si ya había una advertencia visible para evitar
+   * que desaparezca antes de que el usuario pueda leerla.
+   *
+   * @param {string} msg - Mensaje de advertencia a mostrar.
+   */
+  function showWarning(msg) {
+    setWarning(msg)
+    clearTimeout(warningTimer.current)
+    warningTimer.current = setTimeout(() => setWarning(''), 3500)
+  }
+
+  /**
+   * Obtiene la lista paginada de usuarios desde la API.
+   *
+   * Construye los query params con la página actual, el límite, la búsqueda (si hay)
+   * y el filtro de rol (si hay), y llama a GET /users/.
+   * Es un callback memoizado que se regenera solo cuando cambian `page`, `debouncedSearch` o `roleFilter`.
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
   const fetchUsers = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await api.get('/users/')
-      setUsers(Array.isArray(res.data) ? res.data : res.data.users ?? [])
+      const params = new URLSearchParams({ page, limit: PAGE_SIZE })
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
+      if (roleFilter) params.set('role', roleFilter)
+
+      const res = await api.get(`/users/?${params}`)
+      setUsers(res.data.users ?? [])
+      setTotal(res.data.total ?? 0)
+      setTotalPages(res.data.totalPages ?? 1)
     } catch {
       setError('No se pudieron cargar los usuarios.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, debouncedSearch, roleFilter])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
 
+  /**
+   * Alterna el estado de bloqueo de un usuario (bloquear ↔ desbloquear).
+   *
+   * Si el usuario es administrador, muestra un toast de advertencia y retorna sin hacer nada.
+   * De lo contrario, llama a PATCH /users/:id/block o PATCH /users/:id/unblock según corresponda,
+   * y actualiza el estado local del usuario sin recargar toda la lista.
+   * Durante la operación, marca al usuario como "en carga" para deshabilitar su botón.
+   *
+   * @async
+   * @param {{ id: number, isAdmin: boolean, isBlocked: boolean }} user - Objeto del usuario a modificar.
+   * @returns {Promise<void>}
+   */
   async function toggleBlock(user) {
-    const endpoint = user.is_blocked ? `/users/${user.id}/unblock` : `/users/${user.id}/block`
+    if (user.isAdmin) {
+      showWarning('No podés bloquear a otro administrador del sistema.')
+      return
+    }
+    const endpoint = user.isBlocked ? `/users/${user.id}/unblock` : `/users/${user.id}/block`
     setActionLoading(user.id)
     try {
       await api.patch(endpoint)
-      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_blocked: !u.is_blocked } : u))
+      setUsers(prev =>
+        prev.map(u => u.id === user.id ? { ...u, isBlocked: !u.isBlocked } : u)
+      )
     } catch {
       alert('No se pudo realizar la acción. Intentá de nuevo.')
     } finally {
@@ -37,17 +151,15 @@ export default function Users() {
     }
   }
 
-  const filtered = users.filter(u => {
-    const q = search.toLowerCase()
-    return (
-      (u.email ?? '').toLowerCase().includes(q) ||
-      (u.name ?? u.full_name ?? '').toLowerCase().includes(q) ||
-      String(u.id ?? '').includes(q)
-    )
-  })
-
   return (
     <div style={styles.page}>
+      {/* Warning toast */}
+      {warning && (
+        <div style={styles.warningToast}>
+          ⚠️ {warning}
+        </div>
+      )}
+
       {/* Header */}
       <div style={styles.header}>
         <div>
@@ -59,105 +171,225 @@ export default function Users() {
         </button>
       </div>
 
-      {/* Search */}
+      {/* Toolbar: búsqueda + filtro de rol + contador */}
       <div style={styles.toolbar}>
-        <input
-          style={styles.search}
-          type="text"
-          placeholder="Buscar por nombre, email o ID…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <div style={styles.searchWrapper}>
+          <span style={styles.searchIcon}>🔍</span>
+          <input
+            style={styles.search}
+            type="text"
+            placeholder="Buscar por nombre o email…"
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+          />
+          {search && (
+            <button style={styles.clearBtn} onClick={() => handleSearchChange('')}>✕</button>
+          )}
+        </div>
+
+        <div style={styles.roleFilters}>
+          {ROLE_FILTERS.map(f => (
+            <button
+              key={f.value}
+              style={{
+                ...styles.filterBtn,
+                ...(roleFilter === f.value ? styles.filterBtnActive : {}),
+              }}
+              onClick={() => handleRoleChange(f.value)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
         <span style={styles.count}>
-          {loading ? '…' : `${filtered.length} usuario${filtered.length !== 1 ? 's' : ''}`}
+          {loading ? '…' : `${total} usuario${total !== 1 ? 's' : ''}`}
         </span>
       </div>
 
       {/* Error */}
       {error && <div style={styles.errorBox}>{error}</div>}
 
-      {/* Table */}
+      {/* Tabla */}
       <div style={styles.card}>
         {loading ? (
           <div style={styles.center}>Cargando usuarios…</div>
-        ) : filtered.length === 0 ? (
-          <div style={styles.center}>No se encontraron usuarios.</div>
-        ) : (
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  {['ID', 'Nombre', 'Email', 'Rol', 'Estado', 'Registrado', 'Acciones'].map(h => (
-                    <th key={h} style={styles.th}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(user => (
-                  <tr key={user.id} style={styles.tr}>
-                    <td style={styles.td}>
-                      <span style={styles.mono}>#{String(user.id ?? '').slice(0, 8)}</span>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={styles.nameCell}>
-                        <div style={styles.avatar}>
-                          {(user.name ?? user.full_name ?? user.email ?? '?')[0].toUpperCase()}
-                        </div>
-                        <span>{user.name ?? user.full_name ?? '—'}</span>
-                      </div>
-                    </td>
-                    <td style={styles.td}>{user.email ?? '—'}</td>
-                    <td style={styles.td}>
-                      <RoleBadge role={user.role} />
-                    </td>
-                    <td style={styles.td}>
-                      <StatusBadge blocked={user.is_blocked} />
-                    </td>
-                    <td style={styles.td}>
-                      {user.created_at
-                        ? new Date(user.created_at).toLocaleDateString('es-AR')
-                        : '—'}
-                    </td>
-                    <td style={styles.td}>
-                      <button
-                        style={{
-                          ...styles.actionBtn,
-                          ...(user.is_blocked ? styles.unblockBtn : styles.blockBtn),
-                          opacity: actionLoading === user.id ? 0.6 : 1,
-                        }}
-                        onClick={() => toggleBlock(user)}
-                        disabled={actionLoading === user.id}
-                      >
-                        {actionLoading === user.id
-                          ? '…'
-                          : user.is_blocked ? '✅ Desbloquear' : '🚫 Bloquear'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        ) : users.length === 0 ? (
+          <div style={styles.center}>
+            {debouncedSearch || roleFilter
+              ? 'Sin resultados para los filtros aplicados.'
+              : 'No hay usuarios registrados.'}
           </div>
+        ) : (
+          <>
+            <div style={styles.tableWrapper}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    {['Usuario', 'Email', 'Rol', 'Estado', 'Registrado', 'Acciones'].map(h => (
+                      <th key={h} style={styles.th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(user => (
+                    <tr key={user.id} style={styles.tr}>
+                      <td style={styles.td}>
+                        <div style={styles.nameCell}>
+                          <div style={styles.avatar}>
+                            {(user.fullName ?? user.email ?? '?')[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={styles.userName}>{user.fullName ?? '—'}</div>
+                            <div style={styles.userId}>ID #{user.id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={styles.td}>{user.email}</td>
+                      <td style={styles.td}>
+                        <RoleBadge isAdmin={user.isAdmin} />
+                      </td>
+                      <td style={styles.td}>
+                        <StatusBadge blocked={user.isBlocked} />
+                      </td>
+                      <td style={styles.td}>
+                        {user.createdAt
+                          ? new Date(user.createdAt).toLocaleDateString('es-AR')
+                          : '—'}
+                      </td>
+                      <td style={styles.td}>
+                        <button
+                          style={{
+                            ...styles.actionBtn,
+                            ...(user.isBlocked ? styles.unblockBtn : styles.blockBtn),
+                            opacity: actionLoading === user.id ? 0.6 : 1,
+                          }}
+                          onClick={() => toggleBlock(user)}
+                          disabled={actionLoading === user.id}
+                        >
+                          {actionLoading === user.id
+                            ? '…'
+                            : user.isBlocked ? '✅ Desbloquear' : '🚫 Bloquear'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+            )}
+          </>
         )}
       </div>
     </div>
   )
 }
 
-function RoleBadge({ role }) {
-  const map = {
-    admin:  { label: 'Admin',   bg: COLORS.primaryLight, color: COLORS.primary },
-    seller: { label: 'Vendedor', bg: COLORS.infoLight,    color: COLORS.info    },
-    buyer:  { label: 'Comprador', bg: '#f1f5f9',          color: COLORS.textSecondary },
-  }
-  const s = map[role] ?? { label: role ?? 'Usuario', bg: '#f1f5f9', color: COLORS.textSecondary }
-  return <span style={{ ...styles.badge, backgroundColor: s.bg, color: s.color }}>{s.label}</span>
+/**
+ * Muestra un badge indicando si un usuario es administrador o usuario regular.
+ *
+ * @param {{ isAdmin: boolean }} props
+ * @param {boolean} props.isAdmin - `true` si el usuario tiene rol de administrador.
+ * @returns {JSX.Element} Badge de color morado para admins o gris para usuarios regulares.
+ */
+function RoleBadge({ isAdmin }) {
+  return isAdmin
+    ? <span style={{ ...styles.badge, backgroundColor: COLORS.primaryLight, color: COLORS.primary }}>Admin</span>
+    : <span style={{ ...styles.badge, backgroundColor: '#f1f5f9', color: COLORS.textSecondary }}>Usuario</span>
 }
 
+/**
+ * Muestra un badge indicando si un usuario está bloqueado o activo.
+ *
+ * @param {{ blocked: boolean }} props
+ * @param {boolean} props.blocked - `true` si el usuario está bloqueado.
+ * @returns {JSX.Element} Badge rojo para "Bloqueado" o verde para "Activo".
+ */
 function StatusBadge({ blocked }) {
   return blocked
     ? <span style={{ ...styles.badge, backgroundColor: COLORS.errorLight, color: COLORS.error }}>Bloqueado</span>
     : <span style={{ ...styles.badge, backgroundColor: COLORS.successLight, color: COLORS.success }}>Activo</span>
+}
+
+/**
+ * Componente de paginación con navegación anterior/siguiente y botones de página numerados.
+ *
+ * Usa `buildPageList` para generar la secuencia de páginas con ellipsis (`…`) cuando
+ * hay muchas páginas. El botón "Anterior" se deshabilita en la primera página y
+ * "Siguiente" en la última.
+ *
+ * @param {{ page: number, totalPages: number, onChange: (page: number) => void }} props
+ * @param {number} props.page - Página actualmente seleccionada.
+ * @param {number} props.totalPages - Cantidad total de páginas disponibles.
+ * @param {(page: number) => void} props.onChange - Callback invocado al cambiar de página.
+ * @returns {JSX.Element} Barra de paginación con botones de navegación.
+ */
+function Pagination({ page, totalPages, onChange }) {
+  const pages = buildPageList(page, totalPages)
+  return (
+    <div style={styles.pagination}>
+      <button
+        style={{ ...styles.pageBtn, ...(page === 1 ? styles.pageBtnDisabled : {}) }}
+        onClick={() => onChange(page - 1)}
+        disabled={page === 1}
+      >
+        ← Anterior
+      </button>
+      <div style={styles.pageNumbers}>
+        {pages.map((p, i) =>
+          p === '…' ? (
+            <span key={`e${i}`} style={styles.ellipsis}>…</span>
+          ) : (
+            <button
+              key={p}
+              style={{ ...styles.pageNum, ...(p === page ? styles.pageNumActive : {}) }}
+              onClick={() => onChange(p)}
+            >
+              {p}
+            </button>
+          )
+        )}
+      </div>
+      <button
+        style={{ ...styles.pageBtn, ...(page === totalPages ? styles.pageBtnDisabled : {}) }}
+        onClick={() => onChange(page + 1)}
+        disabled={page === totalPages}
+      >
+        Siguiente →
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Construye la lista de páginas a mostrar en el paginador, insertando `'…'` como ellipsis
+ * cuando hay saltos entre páginas no contiguas.
+ *
+ * Para totales de 7 páginas o menos devuelve todas las páginas sin ellipsis.
+ * Para totales mayores, incluye siempre la primera y la última página, la página actual
+ * y sus vecinas inmediatas (current-1, current+1), filtrando fuera de rango.
+ *
+ * @param {number} current - Página actualmente activa.
+ * @param {number} total - Cantidad total de páginas.
+ * @returns {Array<number | '…'>} Arreglo con los números de página y marcadores de ellipsis.
+ *
+ * @example
+ * buildPageList(5, 20) // → [1, '…', 4, 5, 6, '…', 20]
+ * buildPageList(1, 4)  // → [1, 2, 3, 4]
+ */
+function buildPageList(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages = new Set([1, total, current, current - 1, current + 1].filter(p => p >= 1 && p <= total))
+  const sorted = [...pages].sort((a, b) => a - b)
+  const result = []
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('…')
+    result.push(sorted[i])
+  }
+  return result
 }
 
 const styles = {
@@ -170,13 +402,39 @@ const styles = {
     backgroundColor: COLORS.white, color: COLORS.textPrimary, fontSize: 13,
     fontWeight: 600, cursor: 'pointer',
   },
-  toolbar: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 },
+
+  warningToast: {
+    position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
+    backgroundColor: COLORS.warningLight, color: '#92400e',
+    border: `1px solid ${COLORS.warning}`, borderRadius: 10,
+    padding: '12px 20px', fontSize: 13, fontWeight: 600,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 1000,
+    whiteSpace: 'nowrap',
+  },
+
+  toolbar: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' },
+  searchWrapper: { flex: 1, minWidth: 200, position: 'relative', display: 'flex', alignItems: 'center' },
+  searchIcon: { position: 'absolute', left: 12, fontSize: 14, pointerEvents: 'none' },
   search: {
-    flex: 1, height: 40, border: `1.5px solid ${COLORS.border}`, borderRadius: 8,
-    padding: '0 14px', fontSize: 13, outline: 'none', color: COLORS.textPrimary,
+    width: '100%', height: 40, border: `1.5px solid ${COLORS.border}`, borderRadius: 8,
+    padding: '0 36px 0 36px', fontSize: 13, outline: 'none', color: COLORS.textPrimary,
     backgroundColor: COLORS.white,
   },
+  clearBtn: {
+    position: 'absolute', right: 10, background: 'none', border: 'none',
+    cursor: 'pointer', color: COLORS.textMuted, fontSize: 14, padding: '0 2px',
+  },
+  roleFilters: { display: 'flex', gap: 6 },
+  filterBtn: {
+    padding: '6px 14px', borderRadius: 20, border: `1px solid ${COLORS.border}`,
+    backgroundColor: COLORS.white, color: COLORS.textSecondary,
+    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+  },
+  filterBtnActive: {
+    backgroundColor: COLORS.primary, color: COLORS.white, border: `1px solid ${COLORS.primary}`,
+  },
   count: { fontSize: 13, color: COLORS.textSecondary, whiteSpace: 'nowrap' },
+
   errorBox: {
     backgroundColor: COLORS.errorLight, color: COLORS.error, borderRadius: 8,
     padding: '10px 14px', fontSize: 13, marginBottom: 16,
@@ -193,20 +451,42 @@ const styles = {
     color: COLORS.textSecondary, backgroundColor: '#f8fafc',
     borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap',
   },
-  tr: { borderBottom: `1px solid ${COLORS.border}`, transition: 'background 0.1s' },
+  tr: { borderBottom: `1px solid ${COLORS.border}` },
   td: { padding: '12px 16px', color: COLORS.textPrimary, verticalAlign: 'middle' },
-  mono: { fontFamily: 'monospace', fontSize: 12, color: COLORS.textSecondary },
   nameCell: { display: 'flex', alignItems: 'center', gap: 10 },
   avatar: {
-    width: 32, height: 32, borderRadius: '50%', backgroundColor: COLORS.primaryLight,
+    width: 34, height: 34, borderRadius: '50%', backgroundColor: COLORS.primaryLight,
     color: COLORS.primary, display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 13, fontWeight: 700, flexShrink: 0,
   },
+  userName: { fontWeight: 600, color: COLORS.textPrimary, fontSize: 13 },
+  userId: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
   badge: { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700 },
   actionBtn: {
     padding: '5px 12px', borderRadius: 6, border: 'none',
     fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
   },
-  blockBtn: { backgroundColor: COLORS.errorLight, color: COLORS.error },
+  blockBtn:   { backgroundColor: COLORS.errorLight,   color: COLORS.error   },
   unblockBtn: { backgroundColor: COLORS.successLight, color: COLORS.success },
+
+  pagination: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '14px 16px', borderTop: `1px solid ${COLORS.border}`,
+  },
+  pageBtn: {
+    padding: '6px 14px', borderRadius: 8, border: `1px solid ${COLORS.border}`,
+    backgroundColor: COLORS.white, color: COLORS.textPrimary,
+    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  },
+  pageBtnDisabled: { opacity: 0.4, cursor: 'default' },
+  pageNumbers: { display: 'flex', gap: 4, alignItems: 'center' },
+  pageNum: {
+    width: 34, height: 34, borderRadius: 8, border: `1px solid ${COLORS.border}`,
+    backgroundColor: COLORS.white, color: COLORS.textPrimary,
+    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  },
+  pageNumActive: {
+    backgroundColor: COLORS.primary, color: COLORS.white, border: `1px solid ${COLORS.primary}`,
+  },
+  ellipsis: { fontSize: 13, color: COLORS.textMuted, padding: '0 4px' },
 }

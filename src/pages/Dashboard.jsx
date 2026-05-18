@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
 
+/**
+ * Configuración estática de las tarjetas de estadísticas del dashboard.
+ * Cada entrada define la clave del dato en el estado `stats`, la etiqueta visible,
+ * el ícono y los colores de fondo/texto del ícono.
+ *
+ * @type {Array<{ key: string, label: string, icon: string, color: string, bg: string }>}
+ */
 const STAT_CARDS = [
   { key: 'users',    label: 'Usuarios registrados', icon: '👥', color: COLORS.info,    bg: COLORS.infoLight    },
   { key: 'products', label: 'Productos activos',     icon: '📦', color: COLORS.success, bg: COLORS.successLight },
@@ -9,12 +16,35 @@ const STAT_CARDS = [
   { key: 'revenue',  label: 'Ingresos del mes',      icon: '💰', color: COLORS.primary, bg: COLORS.primaryLight },
 ]
 
+/**
+ * Página principal del panel de administración.
+ *
+ * Muestra cuatro tarjetas de resumen (usuarios, productos, órdenes, ingresos del mes),
+ * una tabla con las últimas cinco órdenes del sistema y dos placeholders para gráficos futuros.
+ *
+ * Los datos se obtienen en paralelo al montar el componente usando `Promise.allSettled`,
+ * de modo que el fallo de uno de los endpoints no bloquea la visualización del otro.
+ *
+ * @returns {JSX.Element} Vista completa del dashboard con stats, tabla y placeholders de gráficos.
+ */
 export default function Dashboard() {
   const [stats, setStats] = useState({ users: '—', products: '—', orders: '—', revenue: '—' })
   const [recentOrders, setRecentOrders] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    /**
+     * Obtiene los datos estadísticos del sistema en paralelo.
+     *
+     * Llama a GET /users/ y GET /orders/admin/all de forma concurrente.
+     * Si alguno falla, su resultado se descarta y los demás datos siguen mostrándose.
+     * Calcula los ingresos del mes filtrando las órdenes creadas a partir del primer día del mes actual.
+     * Actualiza el estado `stats` con el total de usuarios (campo `total` de la respuesta paginada),
+     * la cantidad de órdenes y el revenue acumulado.
+     *
+     * @async
+     * @returns {Promise<void>}
+     */
     async function fetchStats() {
       try {
         const [usersRes, ordersRes] = await Promise.allSettled([
@@ -22,8 +52,10 @@ export default function Dashboard() {
           api.get('/orders/admin/all'),
         ])
 
-        const users = usersRes.status === 'fulfilled' ? usersRes.value.data : []
-        const orders = ordersRes.status === 'fulfilled' ? ordersRes.value.data : []
+        // /users/ devuelve { users, total, ... } (paginado)
+        const usersData  = usersRes.status  === 'fulfilled' ? usersRes.value.data  : null
+        const ordersData = ordersRes.status === 'fulfilled' ? ordersRes.value.data : []
+        const orders = Array.isArray(ordersData) ? ordersData : ordersData?.orders ?? []
 
         const now = new Date()
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -31,13 +63,13 @@ export default function Dashboard() {
         const revenue = monthOrders.reduce((sum, o) => sum + (o.total_amount || o.total || 0), 0)
 
         setStats({
-          users: Array.isArray(users) ? users.length : '—',
+          users:    usersData?.total ?? '—',
           products: '—',
-          orders: Array.isArray(orders) ? orders.length : '—',
-          revenue: revenue > 0 ? `$${revenue.toLocaleString('es-AR')}` : '$0',
+          orders:   orders.length > 0 ? orders.length : '—',
+          revenue:  revenue > 0 ? `$${revenue.toLocaleString('es-AR')}` : '$0',
         })
 
-        if (Array.isArray(orders)) {
+        if (orders.length > 0) {
           setRecentOrders(orders.slice(0, 5))
         }
       } catch {
@@ -136,6 +168,17 @@ export default function Dashboard() {
   )
 }
 
+/**
+ * Muestra un badge de color según el estado de una orden.
+ *
+ * Mapea los valores `pending`, `paid`, `cancelled` y `delivered` a etiquetas en español
+ * con colores semánticos (amarillo, verde, rojo, azul). Si el estado no está en el mapa,
+ * se muestra el valor crudo con estilo neutro.
+ *
+ * @param {{ status: string }} props
+ * @param {string} props.status - Estado de la orden (ej: 'pending', 'paid').
+ * @returns {JSX.Element} Etiqueta coloreada con el estado de la orden.
+ */
 function StatusBadge({ status }) {
   const map = {
     pending:   { label: 'Pendiente',  bg: COLORS.warningLight, color: COLORS.warning },

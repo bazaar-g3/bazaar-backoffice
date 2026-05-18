@@ -2,8 +2,20 @@ import { useState, useEffect, useCallback } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
 
+/**
+ * Opciones de filtro por estado de orden disponibles en la barra de herramientas.
+ * `'Todos'` representa la opción sin filtro activo.
+ *
+ * @type {string[]}
+ */
 const STATUS_OPTIONS = ['Todos', 'pending', 'paid', 'cancelled', 'delivered']
 
+/**
+ * Mapa de configuración visual para cada estado de orden.
+ * Cada clave corresponde al valor de `order.status` devuelto por la API.
+ *
+ * @type {Object.<string, { label: string, bg: string, color: string }>}
+ */
 const STATUS_LABELS = {
   pending:   { label: 'Pendiente',  bg: COLORS.warningLight, color: COLORS.warning },
   paid:      { label: 'Pagada',     bg: COLORS.successLight, color: COLORS.success },
@@ -11,6 +23,19 @@ const STATUS_LABELS = {
   delivered: { label: 'Entregada',  bg: COLORS.infoLight,    color: COLORS.info    },
 }
 
+/**
+ * Página de visualización de órdenes del sistema para soporte técnico.
+ *
+ * Carga todas las órdenes desde GET /orders/admin/all al montar el componente
+ * y aplica filtros en el cliente (sin paginación server-side) ya que el volumen
+ * de datos es manejable. Permite:
+ * - Búsqueda libre por ID de orden o ID de usuario.
+ * - Filtro por estado mediante pills (Todos / Pendiente / Pagada / Cancelada / Entregada).
+ * - Filas expandibles: al hacer clic en una fila se muestra `OrderDetail` con
+ *   información completa de la orden (método de pago, dirección, ítems, etc.).
+ *
+ * @returns {JSX.Element} Vista de listado de órdenes con filtros y filas expandibles.
+ */
 export default function Orders() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -19,6 +44,17 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState('Todos')
   const [expandedId, setExpandedId] = useState(null)
 
+  /**
+   * Obtiene la lista completa de órdenes desde el endpoint de administración.
+   *
+   * Normaliza la respuesta para manejar tanto arrays directos como objetos
+   * con propiedad `orders` (por compatibilidad con distintas versiones del API).
+   * Es un callback memoizado que no depende de ningún estado cambiante,
+   * por lo que solo se crea una vez y puede usarse como manejador del botón "Actualizar".
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
   const fetchOrders = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -35,6 +71,13 @@ export default function Orders() {
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
+  /**
+   * Lista de órdenes filtrada por búsqueda y estado, calculada de forma derivada.
+   * La búsqueda es case-insensitive y compara contra el ID de la orden y el ID del usuario.
+   * El filtro de estado se aplica solo cuando no es `'Todos'`.
+   *
+   * @type {Array<Object>}
+   */
   const filtered = orders.filter(o => {
     const q = search.toLowerCase()
     const matchSearch =
@@ -158,6 +201,20 @@ export default function Orders() {
   )
 }
 
+/**
+ * Panel de detalle de una orden, mostrado como fila expandida en la tabla.
+ *
+ * Presenta en una grilla los campos principales de la orden (ID completo, usuario,
+ * estado de pago, método de pago, dirección de envío, fecha de actualización) y,
+ * si existen, la lista de ítems con nombre, cantidad y precio unitario.
+ *
+ * Normaliza nombres de campo alternativos para compatibilidad con distintos microservicios
+ * (ej: `items` vs `order_items`, `product_name` vs `name`, `unit_price` vs `price`).
+ *
+ * @param {{ order: Object }} props
+ * @param {Object} props.order - Objeto de orden con todos sus campos.
+ * @returns {JSX.Element} Panel de detalle con grilla de campos e ítems.
+ */
 function OrderDetail({ order }) {
   const items = order.items ?? order.order_items ?? []
   return (
@@ -187,6 +244,15 @@ function OrderDetail({ order }) {
   )
 }
 
+/**
+ * Campo de detalle individual con etiqueta y valor.
+ *
+ * @param {{ label: string, value: any, mono?: boolean }} props
+ * @param {string} props.label - Etiqueta del campo (ej: "Método de pago").
+ * @param {*} props.value - Valor a mostrar; si es `null` o `undefined` se muestra `'—'`.
+ * @param {boolean} [props.mono=false] - Si `true`, aplica fuente monoespaciada al valor (útil para IDs).
+ * @returns {JSX.Element} Par etiqueta/valor apilados verticalmente.
+ */
 function DetailField({ label, value, mono }) {
   return (
     <div style={styles.detailField}>
@@ -198,11 +264,28 @@ function DetailField({ label, value, mono }) {
   )
 }
 
+/**
+ * Muestra un badge de color según el estado de una orden.
+ *
+ * @param {{ status: string }} props
+ * @param {string} props.status - Estado de la orden (ej: `'pending'`, `'paid'`, `'cancelled'`, `'delivered'`).
+ * @returns {JSX.Element} Badge coloreado con la etiqueta del estado en español.
+ */
 function StatusBadge({ status }) {
   const s = STATUS_LABELS[status] ?? { label: status ?? '—', bg: '#f1f5f9', color: COLORS.textSecondary }
   return <span style={{ ...styles.badge, backgroundColor: s.bg, color: s.color }}>{s.label}</span>
 }
 
+/**
+ * Muestra un badge de color según el estado de pago de una orden.
+ *
+ * Mapea `approved`, `pending` y `rejected` a etiquetas en español con colores semánticos.
+ * Para valores desconocidos muestra el valor crudo con estilo neutro.
+ *
+ * @param {{ status: string }} props
+ * @param {string} props.status - Estado de pago (ej: `'approved'`, `'pending'`, `'rejected'`).
+ * @returns {JSX.Element} Badge coloreado con el estado de pago.
+ */
 function PaymentBadge({ status }) {
   const map = {
     approved: { label: 'Aprobado', bg: COLORS.successLight, color: COLORS.success },
