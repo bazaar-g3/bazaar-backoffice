@@ -1,6 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { COLORS } from '../constants/colors'
 
+/**
+ * Ítems de navegación del panel lateral.
+ * Cada entrada define la ruta, la etiqueta visible y el ícono.
+ *
+ * @type {Array<{ path: string, label: string, icon: string }>}
+ */
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Dashboard', icon: '📊' },
   { path: '/users', label: 'Usuarios', icon: '👥' },
@@ -8,9 +14,28 @@ const NAV_ITEMS = [
   { path: '/orders', label: 'Órdenes', icon: '🧾' },
 ]
 
+/**
+ * Shell principal del panel de administración.
+ *
+ * Renderiza la estructura de dos columnas del backoffice:
+ * - Una barra lateral fija a la izquierda con el logo, los enlaces de navegación
+ *   y el botón de cierre de sesión.
+ * - Un área de contenido principal a la derecha que renderiza los `children` pasados.
+ *
+ * Los ítems de navegación usan `NavLink` de React Router, que aplica estilos
+ * de estado activo automáticamente según la ruta actual.
+ *
+ * @param {{ children: React.ReactNode }} props
+ * @param {React.ReactNode} props.children - Contenido de la página activa a renderizar en el área principal.
+ * @returns {JSX.Element} Contenedor completo con sidebar y área principal.
+ */
 export default function Layout({ children }) {
   const navigate = useNavigate()
 
+  /**
+   * Cierra la sesión del administrador eliminando el token JWT del almacenamiento local
+   * y redirigiendo a la página de login.
+   */
   function handleLogout() {
     localStorage.removeItem('token')
     navigate('/login')

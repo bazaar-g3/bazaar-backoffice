@@ -6,6 +6,24 @@ import api from '../api/api'
 const PAGE_SIZE = 20
 
 /**
+ * Decodifica el payload de un JWT del localStorage para obtener el ID del admin autenticado.
+ * Se usa para deshabilitar el botón de bloqueo en la propia fila del admin (CA4).
+ *
+ * @returns {number | null} ID numérico del admin autenticado, o null si no hay token válido.
+ */
+function getAuthenticatedAdminId() {
+  try {
+    const token = localStorage.getItem('token')
+    if (!token) return null
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(base64))
+    return payload?.sub ? parseInt(payload.sub, 10) : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Opciones disponibles para el filtro de rol.
  * El valor vacío `''` representa "sin filtro" (muestra todos los usuarios).
  *
@@ -47,6 +65,8 @@ export default function Users() {
   const [warning, setWarning] = useState('')
   const debounceTimer = useRef(null)
   const warningTimer = useRef(null)
+  // ID del admin autenticado — se usa para deshabilitar el botón de bloqueo en la propia fila (CA4)
+  const currentAdminId = getAuthenticatedAdminId()
 
   /**
    * Maneja cambios en el campo de búsqueda con debounce de 400 ms.
@@ -135,6 +155,10 @@ export default function Users() {
   async function toggleBlock(user) {
     if (user.isAdmin) {
       showWarning('No podés bloquear a otro administrador del sistema.')
+      return
+    }
+    if (user.id === currentAdminId) {
+      showWarning('No podés bloquear tu propia cuenta.')
       return
     }
     const endpoint = user.isBlocked ? `/users/${user.id}/unblock` : `/users/${user.id}/block`
@@ -258,19 +282,25 @@ export default function Users() {
                           : '—'}
                       </td>
                       <td style={styles.td}>
-                        <button
-                          style={{
-                            ...styles.actionBtn,
-                            ...(user.isBlocked ? styles.unblockBtn : styles.blockBtn),
-                            opacity: actionLoading === user.id ? 0.6 : 1,
-                          }}
-                          onClick={() => toggleBlock(user)}
-                          disabled={actionLoading === user.id}
-                        >
-                          {actionLoading === user.id
-                            ? '…'
-                            : user.isBlocked ? '✅ Desbloquear' : '🚫 Bloquear'}
-                        </button>
+                        {user.id === currentAdminId ? (
+                          <span style={styles.selfBadge}>Tu cuenta</span>
+                        ) : (
+                          <button
+                            style={{
+                              ...styles.actionBtn,
+                              ...(user.isAdmin ? styles.disabledBtn : user.isBlocked ? styles.unblockBtn : styles.blockBtn),
+                              opacity: (actionLoading === user.id || user.isAdmin) ? 0.5 : 1,
+                              cursor: user.isAdmin ? 'not-allowed' : 'pointer',
+                            }}
+                            onClick={() => toggleBlock(user)}
+                            disabled={actionLoading === user.id || user.isAdmin}
+                            title={user.isAdmin ? 'No podés bloquear a otro administrador' : undefined}
+                          >
+                            {actionLoading === user.id
+                              ? '…'
+                              : user.isBlocked ? '✅ Desbloquear' : '🚫 Bloquear'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -466,8 +496,10 @@ const styles = {
     padding: '5px 12px', borderRadius: 6, border: 'none',
     fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
   },
-  blockBtn:   { backgroundColor: COLORS.errorLight,   color: COLORS.error   },
-  unblockBtn: { backgroundColor: COLORS.successLight, color: COLORS.success },
+  blockBtn:    { backgroundColor: COLORS.errorLight,   color: COLORS.error   },
+  unblockBtn:  { backgroundColor: COLORS.successLight, color: COLORS.success },
+  disabledBtn: { backgroundColor: '#f1f5f9', color: COLORS.textMuted },
+  selfBadge:   { fontSize: 11, color: COLORS.textMuted, fontStyle: 'italic' },
 
   pagination: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',

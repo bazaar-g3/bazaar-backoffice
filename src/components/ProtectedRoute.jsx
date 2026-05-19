@@ -1,11 +1,14 @@
 import { Navigate } from 'react-router-dom'
 
 /**
- * Decodifica el payload de un JWT para leer el rol y 
- *  decidir si mostrar el panel o redirigir al login.
+ * Decodifica el payload de un JWT sin verificar la firma.
  *
- * @param {string} token
- * @returns {{ sub: string, role: string } | null}
+ * La verificación criptográfica real ocurre en el servidor. Acá solo se extrae
+ * el rol del payload para tomar decisiones de navegación en el cliente,
+ * evitando un round-trip innecesario al servidor.
+ *
+ * @param {string} token - JWT en formato header.payload.signature (base64url).
+ * @returns {{ sub: string, role: string } | null} Payload decodificado, o `null` si el token es inválido o está malformado.
  */
 function parseJwtPayload(token) {
   try {
@@ -17,9 +20,21 @@ function parseJwtPayload(token) {
 }
 
 /**
- * Protege las rutas del backoffice.
- *  Sin token redirige a /login, con token valido verifica tambien el rol. Si no es admin
- * redirige a /login con mensaje de permisos.
+ * Componente de ruta protegida para el panel de administración.
+ *
+ * Verifica que el usuario tenga un token JWT válido con rol `'admin'` antes de
+ * renderizar el contenido protegido. Hay tres casos posibles:
+ *
+ * 1. Sin token en `localStorage` → redirige a `/login`.
+ * 2. Token presente pero malformado o con payload no decodificable → elimina el token
+ *    y redirige a `/login`.
+ * 3. Token válido pero con rol distinto de `'admin'` → elimina el token y redirige
+ *    a `/login?error=forbidden` para que la página de login muestre un mensaje de permisos.
+ * 4. Token válido con `role === 'admin'` → renderiza los `children`.
+ *
+ * @param {{ children: React.ReactNode }} props
+ * @param {React.ReactNode} props.children - Contenido de la ruta protegida a renderizar si el acceso es válido.
+ * @returns {JSX.Element} Los `children` si el acceso está autorizado, o un `<Navigate>` en caso contrario.
  */
 export default function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')

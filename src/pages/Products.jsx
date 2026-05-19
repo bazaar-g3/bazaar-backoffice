@@ -2,6 +2,19 @@ import { useState, useEffect, useCallback } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
 
+/**
+ * Página de moderación de productos del panel de administración.
+ *
+ * Carga todos los productos del catálogo desde GET /products/ al montar el componente
+ * y aplica un filtro de búsqueda en el cliente (sin paginación server-side).
+ * La búsqueda compara contra nombre, descripción, ID y vendedor del producto.
+ *
+ * La eliminación de un producto requiere confirmación explícita del administrador
+ * mediante un modal de confirmación antes de ejecutar DELETE /products/:id.
+ * Al confirmarse, el producto se elimina de la lista local sin recargar todos los datos.
+ *
+ * @returns {JSX.Element} Vista de moderación con tabla de productos y modal de confirmación.
+ */
 export default function Products() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -10,6 +23,16 @@ export default function Products() {
   const [actionLoading, setActionLoading] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null) // product to confirm deletion
 
+  /**
+   * Obtiene la lista de productos desde el endpoint de catálogo.
+   *
+   * Normaliza la respuesta para manejar tanto arrays directos como objetos
+   * con propiedad `products` (por compatibilidad con distintas versiones del API).
+   * Es un callback memoizado sin dependencias, reutilizable como manejador del botón "Actualizar".
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
   const fetchProducts = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -26,6 +49,18 @@ export default function Products() {
 
   useEffect(() => { fetchProducts() }, [fetchProducts])
 
+  /**
+   * Elimina un producto del sistema previa confirmación del administrador.
+   *
+   * Llama a DELETE /products/:id. Si tiene éxito, elimina el producto del estado local
+   * para evitar un refetch completo, y cierra el modal de confirmación.
+   * Si falla, muestra un `alert` nativo con un mensaje de error.
+   * Durante la operación, marca el producto como "en carga" para deshabilitar los botones del modal.
+   *
+   * @async
+   * @param {{ id: number|string, name?: string, title?: string }} product - Producto a eliminar.
+   * @returns {Promise<void>}
+   */
   async function deleteProduct(product) {
     setActionLoading(product.id)
     try {
@@ -39,6 +74,12 @@ export default function Products() {
     }
   }
 
+  /**
+   * Lista de productos filtrada por el término de búsqueda, calculada de forma derivada.
+   * La búsqueda es case-insensitive y compara contra nombre, descripción, ID y seller_id del producto.
+   *
+   * @type {Array<Object>}
+   */
   const filtered = products.filter(p => {
     const q = search.toLowerCase()
     return (
@@ -158,6 +199,18 @@ export default function Products() {
   )
 }
 
+/**
+ * Muestra la imagen miniatura de un producto.
+ *
+ * Si hay URL de imagen, renderiza un `<img>` con `object-fit: cover` y oculta
+ * el elemento si la imagen falla al cargar (via `onError`).
+ * Si no hay URL, muestra un placeholder con el ícono 📦.
+ *
+ * @param {{ src?: string, name?: string }} props
+ * @param {string} [props.src] - URL de la imagen del producto.
+ * @param {string} [props.name] - Nombre del producto (usado como `alt` text).
+ * @returns {JSX.Element} Imagen del producto o placeholder gris.
+ */
 function ProductThumb({ src, name }) {
   if (src) {
     return (
@@ -180,6 +233,18 @@ function ProductThumb({ src, name }) {
   )
 }
 
+/**
+ * Muestra el stock de un producto con indicadores visuales según criticidad.
+ *
+ * - Sin stock (0): badge rojo "Sin stock".
+ * - Stock bajo (<5): badge amarillo con la cantidad.
+ * - Stock normal (≥5): texto gris simple con la cantidad.
+ * - Sin dato (null/undefined): guión gris.
+ *
+ * @param {{ stock: number|null|undefined }} props
+ * @param {number|null|undefined} props.stock - Cantidad de unidades disponibles.
+ * @returns {JSX.Element} Indicador visual del nivel de stock.
+ */
 function StockBadge({ stock }) {
   if (stock == null) return <span style={{ color: COLORS.textMuted }}>—</span>
   if (stock === 0)
@@ -189,6 +254,16 @@ function StockBadge({ stock }) {
   return <span style={{ color: COLORS.textSecondary, fontSize: 13 }}>{stock} uds</span>
 }
 
+/**
+ * Muestra un badge de color según el estado de publicación de un producto.
+ *
+ * Mapea los estados `active`, `inactive`, `reported` y `paused` a etiquetas en español
+ * con colores semánticos. Para valores desconocidos muestra el valor crudo con estilo neutro.
+ *
+ * @param {{ status: string }} props
+ * @param {string} props.status - Estado del producto (ej: `'active'`, `'reported'`).
+ * @returns {JSX.Element} Badge coloreado con el estado del producto.
+ */
 function ProductStatusBadge({ status }) {
   const map = {
     active:   { label: 'Activo',    bg: COLORS.successLight, color: COLORS.success },
@@ -200,6 +275,20 @@ function ProductStatusBadge({ status }) {
   return <span style={{ ...styles.badge, backgroundColor: s.bg, color: s.color }}>{s.label}</span>
 }
 
+/**
+ * Modal de confirmación para la eliminación de un producto.
+ *
+ * Se renderiza como overlay de pantalla completa con fondo oscuro semitransparente.
+ * Muestra el nombre del producto a eliminar y dos botones: cancelar o confirmar.
+ * Ambos botones se deshabilitan durante el proceso de eliminación (`loading`).
+ *
+ * @param {{ product: Object, loading: boolean, onConfirm: () => void, onCancel: () => void }} props
+ * @param {Object} props.product - Producto que se quiere eliminar (debe tener `name`, `title` o `id`).
+ * @param {boolean} props.loading - `true` mientras se ejecuta el DELETE; deshabilita los botones.
+ * @param {() => void} props.onConfirm - Callback ejecutado al confirmar la eliminación.
+ * @param {() => void} props.onCancel - Callback ejecutado al cancelar (cierra el modal).
+ * @returns {JSX.Element} Modal de confirmación con overlay.
+ */
 function ConfirmModal({ product, loading, onConfirm, onCancel }) {
   return (
     <div style={styles.overlay}>
