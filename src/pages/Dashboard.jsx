@@ -10,10 +10,10 @@ import api from '../api/api'
  * @type {Array<{ key: string, label: string, icon: string, color: string, bg: string }>}
  */
 const STAT_CARDS = [
-  { key: 'users',    label: 'Usuarios registrados', icon: '👥', color: COLORS.info,    bg: COLORS.infoLight    },
-  { key: 'products', label: 'Productos activos',     icon: '📦', color: COLORS.success, bg: COLORS.successLight },
-  { key: 'orders',   label: 'Órdenes totales',       icon: '🧾', color: COLORS.warning, bg: COLORS.warningLight },
-  { key: 'revenue',  label: 'Ingresos del mes',      icon: '💰', color: COLORS.primary, bg: COLORS.primaryLight },
+  { key: 'users', label: 'Usuarios registrados', icon: '👥', color: COLORS.info, bg: COLORS.infoLight },
+  { key: 'products', label: 'Productos activos', icon: '📦', color: COLORS.success, bg: COLORS.successLight },
+  { key: 'orders', label: 'Órdenes totales', icon: '🧾', color: COLORS.warning, bg: COLORS.warningLight },
+  { key: 'revenue', label: 'Ingresos del mes', icon: '💰', color: COLORS.primary, bg: COLORS.primaryLight },
 ]
 
 /**
@@ -53,7 +53,7 @@ export default function Dashboard() {
         ])
 
         // /users/ devuelve { users, total, ... } (paginado)
-        const usersData  = usersRes.status  === 'fulfilled' ? usersRes.value.data  : null
+        const usersData = usersRes.status === 'fulfilled' ? usersRes.value.data : null
         const ordersData = ordersRes.status === 'fulfilled' ? ordersRes.value.data : []
         const orders = Array.isArray(ordersData) ? ordersData : ordersData?.orders ?? []
 
@@ -63,10 +63,10 @@ export default function Dashboard() {
         const revenue = monthOrders.reduce((sum, o) => sum + (o.total_amount || o.total || 0), 0)
 
         setStats({
-          users:    usersData?.total ?? '—',
+          users: usersData?.total ?? '—',
           products: '—',
-          orders:   orders.length > 0 ? orders.length : '—',
-          revenue:  revenue > 0 ? `$${revenue.toLocaleString('es-AR')}` : '$0',
+          orders: orders.length > 0 ? orders.length : '—',
+          revenue: revenue > 0 ? `$${revenue.toLocaleString('es-AR')}` : '$0',
         })
 
         if (orders.length > 0) {
@@ -181,10 +181,10 @@ export default function Dashboard() {
  */
 function StatusBadge({ status }) {
   const map = {
-    pending:   { label: 'Pendiente',  bg: COLORS.warningLight, color: COLORS.warning },
-    paid:      { label: 'Pagada',     bg: COLORS.successLight, color: COLORS.success },
-    cancelled: { label: 'Cancelada',  bg: COLORS.errorLight,   color: COLORS.error   },
-    delivered: { label: 'Entregada',  bg: COLORS.infoLight,    color: COLORS.info    },
+    pending: { label: 'Pendiente', bg: COLORS.warningLight, color: COLORS.warning },
+    paid: { label: 'Pagada', bg: COLORS.successLight, color: COLORS.success },
+    cancelled: { label: 'Cancelada', bg: COLORS.errorLight, color: COLORS.error },
+    delivered: { label: 'Entregada', bg: COLORS.infoLight, color: COLORS.info },
   }
   const s = map[status] ?? { label: status ?? '—', bg: '#f1f5f9', color: COLORS.textSecondary }
   return (

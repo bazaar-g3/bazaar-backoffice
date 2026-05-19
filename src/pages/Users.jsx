@@ -43,6 +43,8 @@ const ROLE_FILTERS = [
  * - Búsqueda por nombre o email con debounce de 400 ms para evitar llamadas excesivas a la API.
  * - Filtro de rol (Todos / Usuarios / Admins) mediante pills de selección.
  * - Acciones de bloqueo y desbloqueo por usuario (con protección para no bloquear admins).
+ * - Modal de confirmación antes de bloquear un usuario regular.
+ * - Tooltip informativo al hacer hover sobre el botón deshabilitado de filas de admin.
  * - Toast de advertencia auto-descartable cuando se intenta bloquear un administrador.
  * - Paginación con ellipsis para conjuntos grandes de páginas.
  *
@@ -63,6 +65,8 @@ export default function Users() {
   const [error, setError] = useState('')
   const [actionLoading, setActionLoading] = useState(null)
   const [warning, setWarning] = useState('')
+  /** Usuario pendiente de confirmación de bloqueo. `null` cuando el modal está cerrado. */
+  const [confirmTarget, setConfirmTarget] = useState(null)
   const debounceTimer = useRef(null)
   const warningTimer = useRef(null)
   // ID del admin autenticado — se usa para deshabilitar el botón de bloqueo en la propia fila (CA4)
@@ -141,26 +145,14 @@ export default function Users() {
   useEffect(() => { fetchUsers() }, [fetchUsers])
 
   /**
-   * Alterna el estado de bloqueo de un usuario (bloquear ↔ desbloquear).
-   *
-   * Si el usuario es administrador, muestra un toast de advertencia y retorna sin hacer nada.
-   * De lo contrario, llama a PATCH /users/:id/block o PATCH /users/:id/unblock según corresponda,
-   * y actualiza el estado local del usuario sin recargar toda la lista.
-   * Durante la operación, marca al usuario como "en carga" para deshabilitar su botón.
+   * Ejecuta la llamada a la API para bloquear o desbloquear un usuario
+   * y actualiza el estado local sin recargar toda la lista.
    *
    * @async
-   * @param {{ id: number, isAdmin: boolean, isBlocked: boolean }} user - Objeto del usuario a modificar.
+   * @param {{ id: number, isBlocked: boolean }} user - Usuario a modificar.
    * @returns {Promise<void>}
    */
-  async function toggleBlock(user) {
-    if (user.isAdmin) {
-      showWarning('No podés bloquear a otro administrador del sistema.')
-      return
-    }
-    if (user.id === currentAdminId) {
-      showWarning('No podés bloquear tu propia cuenta.')
-      return
-    }
+  async function executeToggleBlock(user) {
     const endpoint = user.isBlocked ? `/users/${user.id}/unblock` : `/users/${user.id}/block`
     setActionLoading(user.id)
     try {
@@ -175,8 +167,56 @@ export default function Users() {
     }
   }
 
+  /**
+   * Alterna el estado de bloqueo de un usuario (bloquear ↔ desbloquear).
+   *
+   * - Si el usuario es administrador → muestra toast de advertencia y retorna.
+   * - Si el usuario es la propia cuenta del admin → muestra toast y retorna.
+   * - Si la acción es bloquear → abre el modal de confirmación.
+   * - Si la acción es desbloquear → ejecuta directamente sin confirmación.
+   *
+   * @param {{ id: number, isAdmin: boolean, isBlocked: boolean }} user - Usuario a modificar.
+   */
+  function toggleBlock(user) {
+    if (user.isAdmin) {
+      showWarning('No podés bloquear a otro administrador del sistema.')
+      return
+    }
+    if (user.id === currentAdminId) {
+      showWarning('No podés bloquear tu propia cuenta.')
+      return
+    }
+    if (!user.isBlocked) {
+      // Bloquear requiere confirmación explícita
+      setConfirmTarget(user)
+      return
+    }
+    // Desbloquear es una acción de baja consecuencia, no requiere confirmación
+    executeToggleBlock(user)
+  }
+
+  /**
+   * Confirma el bloqueo del usuario pendiente y cierra el modal.
+   * Llamado desde el botón "Bloquear" del modal de confirmación.
+   */
+  async function handleConfirmBlock() {
+    const user = confirmTarget
+    setConfirmTarget(null)
+    await executeToggleBlock(user)
+  }
+
   return (
     <div style={styles.page}>
+
+      {/* Modal de confirmación de bloqueo */}
+      {confirmTarget && (
+        <ConfirmBlockModal
+          user={confirmTarget}
+          onConfirm={handleConfirmBlock}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
+
       {/* Warning toast */}
       {warning && (
         <div style={styles.warningToast}>
@@ -284,17 +324,17 @@ export default function Users() {
                       <td style={styles.td}>
                         {user.id === currentAdminId ? (
                           <span style={styles.selfBadge}>Tu cuenta</span>
+                        ) : user.isAdmin ? (
+                          <AdminBlockedButton />
                         ) : (
                           <button
                             style={{
                               ...styles.actionBtn,
-                              ...(user.isAdmin ? styles.disabledBtn : user.isBlocked ? styles.unblockBtn : styles.blockBtn),
-                              opacity: (actionLoading === user.id || user.isAdmin) ? 0.5 : 1,
-                              cursor: user.isAdmin ? 'not-allowed' : 'pointer',
+                              ...(user.isBlocked ? styles.unblockBtn : styles.blockBtn),
+                              opacity: actionLoading === user.id ? 0.5 : 1,
                             }}
                             onClick={() => toggleBlock(user)}
-                            disabled={actionLoading === user.id || user.isAdmin}
-                            title={user.isAdmin ? 'No podés bloquear a otro administrador' : undefined}
+                            disabled={actionLoading === user.id}
                           >
                             {actionLoading === user.id
                               ? '…'
@@ -313,6 +353,86 @@ export default function Users() {
             )}
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Subcomponentes
+// ---------------------------------------------------------------------------
+
+/**
+ * Botón deshabilitado para filas de administrador, con tooltip informativo
+ * que aparece al hacer hover explicando por qué no se puede bloquear.
+ *
+ * @returns {JSX.Element}
+ */
+function AdminBlockedButton() {
+  const [tooltipVisible, setTooltipVisible] = useState(false)
+
+  return (
+    <div
+      style={{ position: 'relative', display: 'inline-block' }}
+      onMouseEnter={() => setTooltipVisible(true)}
+      onMouseLeave={() => setTooltipVisible(false)}
+    >
+      <button
+        style={{ ...styles.actionBtn, ...styles.disabledBtn, cursor: 'not-allowed', opacity: 0.6 }}
+        disabled
+      >
+        🚫 Bloquear
+      </button>
+
+      {tooltipVisible && (
+        <div style={styles.adminTooltip}>
+          <span style={styles.adminTooltipIcon}>ℹ️</span>
+          No se pueden bloquear cuentas de administrador
+          {/* Flecha apuntando hacia abajo */}
+          <div style={styles.adminTooltipArrow} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Modal de confirmación de bloqueo centrado en la pantalla con overlay oscuro.
+ *
+ * @param {{ user: object, onConfirm: () => void, onCancel: () => void }} props
+ * @param {object}   props.user      - Usuario que se va a bloquear.
+ * @param {Function} props.onConfirm - Callback al confirmar el bloqueo.
+ * @param {Function} props.onCancel  - Callback al cancelar.
+ * @returns {JSX.Element}
+ */
+function ConfirmBlockModal({ user, onConfirm, onCancel }) {
+  const displayName = user.fullName ?? user.email ?? `Usuario #${user.id}`
+
+  return (
+    <div style={styles.overlay} onClick={onCancel}>
+      {/* stopPropagation para que click dentro del modal no cierre el overlay */}
+      <div style={styles.modal} onClick={e => e.stopPropagation()}>
+        <div style={styles.modalWarningIcon}>⚠️</div>
+
+        <h2 style={styles.modalTitle}>¡Atención!</h2>
+
+        <p style={styles.modalBody}>
+          Estás a punto de bloquear la cuenta de{' '}
+          <strong style={{ color: COLORS.textPrimary }}>{displayName}</strong>.
+        </p>
+        <p style={styles.modalSubtext}>
+          El usuario no podrá iniciar sesión y sus productos serán ocultados del catálogo.
+        </p>
+        <p style={styles.modalQuestion}>¿Estás seguro?</p>
+
+        <div style={styles.modalActions}>
+          <button style={styles.cancelBtn} onClick={onCancel}>
+            Cancelar
+          </button>
+          <button style={styles.confirmBtn} onClick={onConfirm}>
+            🚫 Bloquear
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -422,6 +542,10 @@ function buildPageList(current, total) {
   return result
 }
 
+// ---------------------------------------------------------------------------
+// Estilos
+// ---------------------------------------------------------------------------
+
 const styles = {
   page: { padding: '32px 36px', maxWidth: 1100 },
   header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 },
@@ -500,6 +624,120 @@ const styles = {
   unblockBtn:  { backgroundColor: COLORS.successLight, color: COLORS.success },
   disabledBtn: { backgroundColor: '#f1f5f9', color: COLORS.textMuted },
   selfBadge:   { fontSize: 11, color: COLORS.textMuted, fontStyle: 'italic' },
+
+  // Tooltip del botón de admin
+  adminTooltip: {
+    position: 'absolute',
+    bottom: 'calc(100% + 8px)',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    backgroundColor: COLORS.textPrimary,
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: 500,
+    padding: '7px 11px',
+    borderRadius: 7,
+    whiteSpace: 'nowrap',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+    zIndex: 100,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    pointerEvents: 'none',
+  },
+  adminTooltipIcon: { fontSize: 12 },
+  adminTooltipArrow: {
+    position: 'absolute',
+    top: '100%',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: 0,
+    height: 0,
+    borderLeft: '6px solid transparent',
+    borderRight: '6px solid transparent',
+    borderTop: `6px solid ${COLORS.textPrimary}`,
+  },
+
+  // Modal de confirmación de bloqueo
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+    backdropFilter: 'blur(2px)',
+  },
+  modal: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: '36px 40px',
+    maxWidth: 440,
+    width: '90%',
+    textAlign: 'center',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 0,
+  },
+  modalWarningIcon: {
+    fontSize: 44,
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 800,
+    color: COLORS.textPrimary,
+    margin: '0 0 14px',
+  },
+  modalBody: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    lineHeight: 1.6,
+    margin: '0 0 6px',
+  },
+  modalSubtext: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    margin: '0 0 6px',
+    lineHeight: 1.5,
+  },
+  modalQuestion: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: COLORS.textPrimary,
+    margin: '10px 0 24px',
+  },
+  modalActions: {
+    display: 'flex',
+    gap: 12,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  cancelBtn: {
+    flex: 1,
+    padding: '10px 0',
+    borderRadius: 8,
+    border: `1.5px solid ${COLORS.border}`,
+    backgroundColor: COLORS.white,
+    color: COLORS.textPrimary,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  confirmBtn: {
+    flex: 1,
+    padding: '10px 0',
+    borderRadius: 8,
+    border: 'none',
+    backgroundColor: COLORS.error,
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
 
   pagination: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
