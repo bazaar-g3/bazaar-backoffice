@@ -36,32 +36,38 @@ const STATUS_LABELS = {
  *
  * @returns {JSX.Element} Vista de listado de órdenes con filtros y filas expandibles.
  */
+const PAGE_SIZE = 20
+
 export default function Orders() {
   const [orders, setOrders] = useState([])
+  const [totalOrders, setTotalOrders] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('Todos')
   const [expandedId, setExpandedId] = useState(null)
+  const [expandedDetail, setExpandedDetail] = useState(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
 
-  /**
-   * Obtiene la lista completa de órdenes desde el endpoint de administración.
-   *
-   * Normaliza la respuesta para manejar tanto arrays directos como objetos
-   * con propiedad `orders` (por compatibilidad con distintas versiones del API).
-   * Es un callback memoizado que no depende de ningún estado cambiante,
-   * por lo que solo se crea una vez y puede usarse como manejador del botón "Actualizar".
-   *
-   * @async
-   * @returns {Promise<void>}
-   */
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (currentPage = 1, currentStatus = 'Todos') => {
     setLoading(true)
     setError('')
     try {
-      const res = await api.get('/orders/admin/all')
+      const params = { page: currentPage, page_size: PAGE_SIZE }
+      if (currentStatus !== 'Todos') params.status = currentStatus
+      const res = await api.get('/orders/admin/all', { params })
       const data = res.data
-      setOrders(Array.isArray(data) ? data : data.orders ?? [])
+      if (Array.isArray(data)) {
+        setOrders(data)
+        setTotalOrders(data.length)
+        setTotalPages(1)
+      } else {
+        setOrders(data.orders ?? [])
+        setTotalOrders(data.total ?? 0)
+        setTotalPages(data.pages ?? 1)
+      }
     } catch {
       setError('No se pudieron cargar las órdenes.')
     } finally {
@@ -69,7 +75,24 @@ export default function Orders() {
     }
   }, [])
 
-  useEffect(() => { fetchOrders() }, [fetchOrders])
+  useEffect(() => {
+    fetchOrders(page, statusFilter)
+  }, [fetchOrders, page, statusFilter])
+
+  useEffect(() => {
+    if (!expandedId) {
+      setExpandedDetail(null)
+      return
+    }
+    let cancelled = false
+    setLoadingDetail(true)
+    setExpandedDetail(null)
+    api.get(`/orders/admin/${expandedId}`)
+      .then(res => { if (!cancelled) setExpandedDetail(res.data) })
+      .catch(() => { if (!cancelled) setExpandedDetail(null) })
+      .finally(() => { if (!cancelled) setLoadingDetail(false) })
+    return () => { cancelled = true }
+  }, [expandedId])
 
   /**
    * Lista de órdenes filtrada por búsqueda y estado, calculada de forma derivada.
@@ -78,14 +101,26 @@ export default function Orders() {
    *
    * @type {Array<Object>}
    */
+  // El filtro de estado es server-side; aquí solo filtramos por búsqueda local.
   const filtered = orders.filter(o => {
+    if (!search) return true
     const q = search.toLowerCase()
-    const matchSearch =
+    return (
       String(o.id ?? '').toLowerCase().includes(q) ||
       String(o.user_id ?? o.buyer_id ?? '').toLowerCase().includes(q)
-    const matchStatus = statusFilter === 'Todos' || o.status === statusFilter
-    return matchSearch && matchStatus
+    )
   })
+
+  const handleStatusChange = (s) => {
+    setStatusFilter(s)
+    setPage(1)
+    setExpandedId(null)
+  }
+
+  const handlePageChange = (next) => {
+    setPage(next)
+    setExpandedId(null)
+  }
 
   return (
     <div style={styles.page}>
@@ -95,8 +130,8 @@ export default function Orders() {
           <h1 style={styles.title}>Órdenes</h1>
           <p style={styles.subtitle}>Soporte técnico — todas las órdenes del sistema</p>
         </div>
-        <button style={styles.refreshBtn} onClick={fetchOrders} disabled={loading}>
-          🔄 Actualizar
+        <button style={styles.refreshBtn} onClick={() => fetchOrders(page, statusFilter)} disabled={loading}>
+          Actualizar
         </button>
       </div>
 
@@ -118,7 +153,7 @@ export default function Orders() {
                 ...styles.filterBtn,
                 ...(statusFilter === s ? styles.filterBtnActive : {}),
               }}
-              onClick={() => setStatusFilter(s)}
+              onClick={() => handleStatusChange(s)}
             >
               {s === 'Todos' ? 'Todos' : (STATUS_LABELS[s]?.label ?? s)}
             </button>
@@ -126,7 +161,7 @@ export default function Orders() {
         </div>
 
         <span style={styles.count}>
-          {loading ? '…' : `${filtered.length} orden${filtered.length !== 1 ? 'es' : ''}`}
+          {loading ? '…' : `${totalOrders} orden${totalOrders !== 1 ? 'es' : ''}`}
         </span>
       </div>
 
@@ -141,6 +176,7 @@ export default function Orders() {
           <div style={styles.center}>No hay órdenes que coincidan con los filtros.</div>
         ) : (
           <div style={styles.tableWrapper}>
+
             <table style={styles.table}>
               <thead>
                 <tr>
@@ -186,7 +222,12 @@ export default function Orders() {
                     {expandedId === order.id && (
                       <tr key={`${order.id}-detail`}>
                         <td colSpan={7} style={styles.expandedCell}>
-                          <OrderDetail order={order} />
+                          {loadingDetail
+                            ? <div style={styles.center}>Cargando detalle…</div>
+                            : expandedDetail
+                              ? <OrderDetail order={expandedDetail} />
+                              : <div style={styles.center}>No se pudo cargar el detalle.</div>
+                          }
                         </td>
                       </tr>
                     )}
@@ -197,6 +238,29 @@ export default function Orders() {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div style={styles.pagination}>
+          <button
+            style={{ ...styles.pageBtn, ...(page === 1 ? styles.pageBtnDisabled : {}) }}
+            onClick={() => handlePageChange(page - 1)}
+            disabled={page === 1}
+          >
+            ← Anterior
+          </button>
+          <span style={styles.pageInfo}>
+            Página {page} de {totalPages}
+          </span>
+          <button
+            style={{ ...styles.pageBtn, ...(page === totalPages ? styles.pageBtnDisabled : {}) }}
+            onClick={() => handlePageChange(page + 1)}
+            disabled={page === totalPages}
+          >
+            Siguiente →
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -215,17 +279,28 @@ export default function Orders() {
  * @param {Object} props.order - Objeto de orden con todos sus campos.
  * @returns {JSX.Element} Panel de detalle con grilla de campos e ítems.
  */
+function formatAddress(addr) {
+  if (!addr) return '—'
+  if (typeof addr === 'string') return addr
+  const { calle, altura, departamento, zona, codigo_postal } = addr
+  let s = `${calle} ${altura}`
+  if (departamento) s += ` Dpto. ${departamento}`
+  if (zona) s += `, ${zona}`
+  if (codigo_postal) s += ` (CP ${codigo_postal})`
+  return s
+}
+
 function OrderDetail({ order }) {
   const items = order.items ?? order.order_items ?? []
   return (
     <div style={styles.detailBox}>
       <div style={styles.detailGrid}>
         <DetailField label="ID completo" value={order.id} mono />
-        <DetailField label="Usuario" value={order.user_id ?? order.buyer_id} mono />
-        <DetailField label="Estado de pago" value={order.payment_status ?? '—'} />
-        <DetailField label="Método de pago" value={order.payment_method ?? '—'} />
-        <DetailField label="Dirección" value={order.shipping_address ?? '—'} />
-        <DetailField label="Actualizado" value={order.updated_at ? new Date(order.updated_at).toLocaleString('es-AR') : '—'} />
+        <DetailField label="Comprador" value={order.user_id ?? order.buyer_id} mono />
+        <DetailField label="Estado" value={order.status ?? '—'} />
+        <DetailField label="Total" value={order.total != null ? `$${Number(order.total).toLocaleString('es-AR')}` : '—'} />
+        <DetailField label="Dirección" value={formatAddress(order.delivery_address ?? order.shipping_address)} />
+        <DetailField label="Fecha" value={order.created_at ? new Date(order.created_at).toLocaleString('es-AR') : '—'} />
       </div>
 
       {items.length > 0 && (
@@ -236,6 +311,35 @@ function OrderDetail({ order }) {
               <span>{item.product_name ?? item.name ?? `Producto #${item.product_id ?? i}`}</span>
               <span style={styles.itemQty}>x{item.quantity ?? 1}</span>
               <span>${(item.unit_price ?? item.price ?? 0).toLocaleString('es-AR')}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(order.status_history ?? []).length > 0 && (
+        <div style={styles.itemsSection}>
+          <div style={styles.itemsTitle}>Historial de estados</div>
+          {(order.status_history ?? []).map((h, i) => (
+            <div key={i} style={styles.historyRow}>
+              <StatusBadge status={h.status} />
+              <span style={styles.historyDate}>
+                {h.changed_at ? new Date(h.changed_at).toLocaleString('es-AR') : '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(order.fulfillments ?? []).length > 0 && (
+        <div style={styles.itemsSection}>
+          <div style={styles.itemsTitle}>Vendedores</div>
+          {(order.fulfillments ?? []).map((f, i) => (
+            <div key={i} style={styles.fulfillmentRow}>
+              <span style={styles.mono}>ID: {f.seller_id}</span>
+              <StatusBadge status={f.status} />
+              {f.tracking_code && (
+                <span style={styles.trackingCode}>Seguimiento: {f.tracking_code}</span>
+              )}
             </div>
           ))}
         </div>
@@ -351,11 +455,34 @@ const styles = {
   detailLabel: { fontSize: 11, fontWeight: 600, color: COLORS.textMuted, textTransform: 'uppercase', marginBottom: 2 },
   detailValue: { fontSize: 13, color: COLORS.textPrimary },
 
-  itemsSection: {},
+  itemsSection: { marginTop: 12 },
   itemsTitle: { fontSize: 11, fontWeight: 600, color: COLORS.textMuted, textTransform: 'uppercase', marginBottom: 8 },
   itemRow: {
     display: 'flex', gap: 16, alignItems: 'center', padding: '6px 0',
     borderBottom: `1px solid ${COLORS.border}`, fontSize: 13, color: COLORS.textPrimary,
   },
   itemQty: { color: COLORS.textSecondary, minWidth: 30 },
+  fulfillmentRow: {
+    display: 'flex', gap: 12, alignItems: 'center', padding: '6px 0',
+    borderBottom: `1px solid ${COLORS.border}`, fontSize: 13,
+  },
+  trackingCode: { color: COLORS.textSecondary, fontSize: 12 },
+  historyRow: {
+    display: 'flex', gap: 12, alignItems: 'center', padding: '5px 0',
+    borderBottom: `1px solid ${COLORS.border}`,
+  },
+  historyDate: { fontSize: 12, color: COLORS.textSecondary },
+  pagination: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: 16, marginTop: 20,
+  },
+  pageBtn: {
+    padding: '8px 16px', borderRadius: 8, border: `1px solid ${COLORS.border}`,
+    backgroundColor: COLORS.white, color: COLORS.textPrimary,
+    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  },
+  pageBtnDisabled: {
+    color: COLORS.textMuted, cursor: 'not-allowed', backgroundColor: '#f8fafc',
+  },
+  pageInfo: { fontSize: 13, color: COLORS.textSecondary },
 }
