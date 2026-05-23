@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { COLORS } from '../constants/colors'
-import api from '../api/api'
+import ordersApi from '../api/ordersApi'
 import { common } from '../styles/common'
 import { ordersStyles } from '../styles/orders'
 
@@ -60,7 +60,7 @@ export default function Orders() {
     try {
       const params = { page: currentPage, page_size: PAGE_SIZE }
       if (currentStatus !== 'Todos') params.status = currentStatus
-      const res = await api.get('/orders/admin/all', { params })
+      const res = await ordersApi.get('/orders/admin/all', { params })
       const data = res.data
       if (Array.isArray(data)) {
         setOrders(data)
@@ -90,7 +90,7 @@ export default function Orders() {
     let cancelled = false
     setLoadingDetail(true)
     setExpandedDetail(null)
-    api.get(`/orders/admin/${expandedId}`)
+    ordersApi.get(`/orders/admin/${expandedId}`)
       .then(res => { if (!cancelled) setExpandedDetail(res.data) })
       .catch(() => { if (!cancelled) setExpandedDetail(null) })
       .finally(() => { if (!cancelled) setLoadingDetail(false) })
@@ -173,7 +173,7 @@ export default function Orders() {
       {error && <div style={styles.errorBox}>{error}</div>}
 
       {/* Table */}
-      <div style={styles.card}>
+      {!error && <div style={styles.card}>
         {loading ? (
           <div style={styles.center}>Cargando órdenes…</div>
         ) : filtered.length === 0 ? (
@@ -241,7 +241,7 @@ export default function Orders() {
             </table>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
+import ordersApi from '../api/ordersApi'
 import { common } from '../styles/common'
 import { dashboardStyles } from '../styles/dashboard'
 
@@ -51,7 +52,7 @@ export default function Dashboard() {
       try {
         const [usersRes, ordersRes] = await Promise.allSettled([
           api.get('/users/'),
-          api.get('/orders/admin/all'),
+          ordersApi.get('/orders/admin/all'),
         ])
 
         // /users/ devuelve { users, total, ... } (paginado)
