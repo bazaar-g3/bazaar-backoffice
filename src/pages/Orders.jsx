@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
+import { common } from '../styles/common'
+import { ordersStyles } from '../styles/orders'
 
 /**
  * Opciones de filtro por estado de orden disponibles en la barra de herramientas.
@@ -19,26 +21,23 @@ const STATUS_OPTIONS = [
 ]
 
 const STATUS_LABELS = {
-  pending_payment:  { label: 'Pend. de pago', bg: COLORS.warningLight, color: COLORS.warning },
-  confirmed:        { label: 'Confirmada',    bg: COLORS.infoLight,    color: COLORS.info    },
-  in_preparation:   { label: 'En preparación',bg: COLORS.infoLight,    color: COLORS.info    },
-  shipped:          { label: 'Enviada',       bg: COLORS.primaryLight, color: COLORS.primary },
-  delivered:        { label: 'Entregada',     bg: COLORS.successLight, color: COLORS.success },
-  payment_rejected: { label: 'Pago rechazado',bg: COLORS.errorLight,   color: COLORS.error   },
+  pending_payment: { label: 'Pend. de pago', bg: COLORS.warningLight, color: COLORS.warning },
+  confirmed: { label: 'Confirmada', bg: COLORS.infoLight, color: COLORS.info },
+  in_preparation: { label: 'En preparación', bg: COLORS.infoLight, color: COLORS.info },
+  shipped: { label: 'Enviada', bg: COLORS.primaryLight, color: COLORS.primary },
+  delivered: { label: 'Entregada', bg: COLORS.successLight, color: COLORS.success },
+  payment_rejected: { label: 'Pago rechazado', bg: COLORS.errorLight, color: COLORS.error },
 }
 
 /**
- * Página de visualización de órdenes del sistema para soporte técnico.
+ * Página de visualización de órdenes del sistema para soporte técnico (solo lectura).
  *
- * Carga todas las órdenes desde GET /orders/admin/all al montar el componente
- * y aplica filtros en el cliente (sin paginación server-side) ya que el volumen
- * de datos es manejable. Permite:
- * - Búsqueda libre por ID de orden o ID de usuario.
- * - Filtro por estado mediante pills (Todos / Pendiente / Pagada / Cancelada / Entregada).
- * - Filas expandibles: al hacer clic en una fila se muestra `OrderDetail` con
- *   información completa de la orden (método de pago, dirección, ítems, etc.).
+ * Carga órdenes paginadas desde GET /orders/admin/all (20 por página). El filtro
+ * por estado se resuelve server-side; la búsqueda por ID o usuario es client-side
+ * sobre la página actual. Al expandir una fila se obtiene el detalle completo
+ * desde GET /orders/admin/{id}, incluyendo ítems, vendedores e historial de estados.
  *
- * @returns {JSX.Element} Vista de listado de órdenes con filtros y filas expandibles.
+ * @returns {JSX.Element} Vista de listado de órdenes con filtros, paginación y detalle expandible.
  */
 const PAGE_SIZE = 20
 
@@ -135,7 +134,7 @@ export default function Orders() {
           <p style={styles.subtitle}>Soporte técnico — todas las órdenes del sistema</p>
         </div>
         <button style={styles.refreshBtn} onClick={() => fetchOrders(page, statusFilter)} disabled={loading}>
-          Actualizar
+          🔄 Actualizar
         </button>
       </div>
 
@@ -398,97 +397,11 @@ function StatusBadge({ status }) {
 function PaymentBadge({ status }) {
   const map = {
     approved: { label: 'Aprobado', bg: COLORS.successLight, color: COLORS.success },
-    pending:  { label: 'Pendiente', bg: COLORS.warningLight, color: COLORS.warning },
-    rejected: { label: 'Rechazado', bg: COLORS.errorLight,   color: COLORS.error   },
+    pending: { label: 'Pendiente', bg: COLORS.warningLight, color: COLORS.warning },
+    rejected: { label: 'Rechazado', bg: COLORS.errorLight, color: COLORS.error },
   }
   const s = map[status] ?? { label: status ?? '—', bg: '#f1f5f9', color: COLORS.textSecondary }
   return <span style={{ ...styles.badge, backgroundColor: s.bg, color: s.color }}>{s.label}</span>
 }
 
-const styles = {
-  page: { padding: '32px 36px', maxWidth: 1100 },
-  header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 },
-  title: { fontSize: 24, fontWeight: 800, color: COLORS.textPrimary, margin: 0 },
-  subtitle: { fontSize: 13, color: COLORS.textSecondary, margin: '4px 0 0' },
-  refreshBtn: {
-    padding: '8px 16px', borderRadius: 8, border: `1px solid ${COLORS.border}`,
-    backgroundColor: COLORS.white, color: COLORS.textPrimary, fontSize: 13,
-    fontWeight: 600, cursor: 'pointer',
-  },
-  toolbar: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 },
-  toolbarRow: { display: 'flex', alignItems: 'center', gap: 12 },
-  search: {
-    flex: 1, height: 40, border: `1.5px solid ${COLORS.border}`, borderRadius: 8,
-    padding: '0 14px', fontSize: 13, outline: 'none', color: COLORS.textPrimary,
-    backgroundColor: COLORS.white,
-  },
-  filterGroup: { display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 },
-  filterBtn: {
-    padding: '6px 12px', borderRadius: 20, border: `1px solid ${COLORS.border}`,
-    backgroundColor: COLORS.white, color: COLORS.textSecondary, fontSize: 12,
-    fontWeight: 600, cursor: 'pointer',
-  },
-  filterBtnActive: {
-    backgroundColor: COLORS.primary, color: COLORS.white, border: `1px solid ${COLORS.primary}`,
-  },
-  count: { fontSize: 13, color: COLORS.textSecondary, whiteSpace: 'nowrap' },
-  errorBox: {
-    backgroundColor: COLORS.errorLight, color: COLORS.error, borderRadius: 8,
-    padding: '10px 14px', fontSize: 13, marginBottom: 16,
-  },
-  card: {
-    backgroundColor: COLORS.white, borderRadius: 12,
-    boxShadow: '0 1px 6px rgba(0,0,0,0.06)', overflow: 'hidden',
-  },
-  center: { textAlign: 'center', color: COLORS.textSecondary, padding: '48px 0', fontSize: 14 },
-  tableWrapper: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th: {
-    textAlign: 'left', padding: '12px 16px', fontWeight: 600,
-    color: COLORS.textSecondary, backgroundColor: '#f8fafc',
-    borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap',
-  },
-  tr: { borderBottom: `1px solid ${COLORS.border}` },
-  td: { padding: '11px 16px', color: COLORS.textPrimary, verticalAlign: 'middle' },
-  mono: { fontFamily: 'monospace', fontSize: 12, color: COLORS.textSecondary },
-  badge: { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700 },
-  expandIcon: { fontSize: 10, color: COLORS.textMuted, cursor: 'pointer' },
-
-  expandedCell: { padding: 0, backgroundColor: '#f8fafc', borderBottom: `1px solid ${COLORS.border}` },
-  detailBox: { padding: '16px 20px' },
-  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px 20px', marginBottom: 16 },
-  detailField: {},
-  detailLabel: { fontSize: 11, fontWeight: 600, color: COLORS.textMuted, textTransform: 'uppercase', marginBottom: 2 },
-  detailValue: { fontSize: 13, color: COLORS.textPrimary },
-
-  itemsSection: { marginTop: 12 },
-  itemsTitle: { fontSize: 11, fontWeight: 600, color: COLORS.textMuted, textTransform: 'uppercase', marginBottom: 8 },
-  itemRow: {
-    display: 'flex', gap: 16, alignItems: 'center', padding: '6px 0',
-    borderBottom: `1px solid ${COLORS.border}`, fontSize: 13, color: COLORS.textPrimary,
-  },
-  itemQty: { color: COLORS.textSecondary, minWidth: 30 },
-  fulfillmentRow: {
-    display: 'flex', gap: 12, alignItems: 'center', padding: '6px 0',
-    borderBottom: `1px solid ${COLORS.border}`, fontSize: 13,
-  },
-  trackingCode: { color: COLORS.textSecondary, fontSize: 12 },
-  historyRow: {
-    display: 'flex', gap: 12, alignItems: 'center', padding: '5px 0',
-    borderBottom: `1px solid ${COLORS.border}`,
-  },
-  historyDate: { fontSize: 12, color: COLORS.textSecondary },
-  pagination: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    gap: 16, marginTop: 20,
-  },
-  pageBtn: {
-    padding: '8px 16px', borderRadius: 8, border: `1px solid ${COLORS.border}`,
-    backgroundColor: COLORS.white, color: COLORS.textPrimary,
-    fontSize: 13, fontWeight: 600, cursor: 'pointer',
-  },
-  pageBtnDisabled: {
-    color: COLORS.textMuted, cursor: 'not-allowed', backgroundColor: '#f8fafc',
-  },
-  pageInfo: { fontSize: 13, color: COLORS.textSecondary },
-}
+const styles = { ...common, ...ordersStyles }

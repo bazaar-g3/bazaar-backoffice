@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
+import { common } from '../styles/common'
+import { productsStyles } from '../styles/products'
 
 /**
  * Página de moderación de productos del panel de administración.
@@ -316,72 +318,4 @@ function ConfirmModal({ product, loading, onConfirm, onCancel }) {
   )
 }
 
-const styles = {
-  page: { padding: '32px 36px', maxWidth: 1100 },
-  header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 },
-  title: { fontSize: 24, fontWeight: 800, color: COLORS.textPrimary, margin: 0 },
-  subtitle: { fontSize: 13, color: COLORS.textSecondary, margin: '4px 0 0' },
-  refreshBtn: {
-    padding: '8px 16px', borderRadius: 8, border: `1px solid ${COLORS.border}`,
-    backgroundColor: COLORS.white, color: COLORS.textPrimary, fontSize: 13,
-    fontWeight: 600, cursor: 'pointer',
-  },
-  toolbar: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 },
-  search: {
-    flex: 1, height: 40, border: `1.5px solid ${COLORS.border}`, borderRadius: 8,
-    padding: '0 14px', fontSize: 13, outline: 'none', color: COLORS.textPrimary,
-    backgroundColor: COLORS.white,
-  },
-  count: { fontSize: 13, color: COLORS.textSecondary, whiteSpace: 'nowrap' },
-  errorBox: {
-    backgroundColor: COLORS.errorLight, color: COLORS.error, borderRadius: 8,
-    padding: '10px 14px', fontSize: 13, marginBottom: 16,
-  },
-  card: {
-    backgroundColor: COLORS.white, borderRadius: 12,
-    boxShadow: '0 1px 6px rgba(0,0,0,0.06)', overflow: 'hidden',
-  },
-  center: { textAlign: 'center', color: COLORS.textSecondary, padding: '48px 0', fontSize: 14 },
-  tableWrapper: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th: {
-    textAlign: 'left', padding: '12px 16px', fontWeight: 600,
-    color: COLORS.textSecondary, backgroundColor: '#f8fafc',
-    borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap',
-  },
-  tr: { borderBottom: `1px solid ${COLORS.border}` },
-  td: { padding: '10px 16px', color: COLORS.textPrimary, verticalAlign: 'middle' },
-  mono: { fontFamily: 'monospace', fontSize: 12, color: COLORS.textSecondary },
-  productName: { fontWeight: 600, color: COLORS.textPrimary, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  productCategory: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
-  badge: { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700 },
-  deleteBtn: {
-    padding: '5px 12px', borderRadius: 6, border: 'none',
-    backgroundColor: COLORS.errorLight, color: COLORS.error,
-    fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-  },
-
-  overlay: {
-    position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999,
-  },
-  modal: {
-    backgroundColor: COLORS.white, borderRadius: 16, padding: '32px 36px',
-    maxWidth: 420, width: '90%', textAlign: 'center',
-    boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
-  },
-  modalIcon: { fontSize: 40, marginBottom: 12 },
-  modalTitle: { fontSize: 20, fontWeight: 800, color: COLORS.textPrimary, margin: '0 0 10px' },
-  modalText: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 1.5, margin: '0 0 24px' },
-  modalActions: { display: 'flex', gap: 12, justifyContent: 'center' },
-  cancelBtn: {
-    padding: '10px 22px', borderRadius: 8, border: `1.5px solid ${COLORS.border}`,
-    backgroundColor: COLORS.white, color: COLORS.textPrimary, fontSize: 14,
-    fontWeight: 700, cursor: 'pointer',
-  },
-  confirmBtn: {
-    padding: '10px 22px', borderRadius: 8, border: 'none',
-    backgroundColor: COLORS.error, color: COLORS.white, fontSize: 14,
-    fontWeight: 700, cursor: 'pointer',
-  },
-}
+const styles = { ...common, ...productsStyles }
