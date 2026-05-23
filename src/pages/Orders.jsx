@@ -8,19 +8,23 @@ import api from '../api/api'
  *
  * @type {string[]}
  */
-const STATUS_OPTIONS = ['Todos', 'pending', 'paid', 'cancelled', 'delivered']
+const STATUS_OPTIONS = [
+  'Todos',
+  'pending_payment',
+  'confirmed',
+  'in_preparation',
+  'shipped',
+  'delivered',
+  'payment_rejected',
+]
 
-/**
- * Mapa de configuración visual para cada estado de orden.
- * Cada clave corresponde al valor de `order.status` devuelto por la API.
- *
- * @type {Object.<string, { label: string, bg: string, color: string }>}
- */
 const STATUS_LABELS = {
-  pending:   { label: 'Pendiente',  bg: COLORS.warningLight, color: COLORS.warning },
-  paid:      { label: 'Pagada',     bg: COLORS.successLight, color: COLORS.success },
-  cancelled: { label: 'Cancelada',  bg: COLORS.errorLight,   color: COLORS.error   },
-  delivered: { label: 'Entregada',  bg: COLORS.infoLight,    color: COLORS.info    },
+  pending_payment:  { label: 'Pend. de pago', bg: COLORS.warningLight, color: COLORS.warning },
+  confirmed:        { label: 'Confirmada',    bg: COLORS.infoLight,    color: COLORS.info    },
+  in_preparation:   { label: 'En preparación',bg: COLORS.infoLight,    color: COLORS.info    },
+  shipped:          { label: 'Enviada',       bg: COLORS.primaryLight, color: COLORS.primary },
+  delivered:        { label: 'Entregada',     bg: COLORS.successLight, color: COLORS.success },
+  payment_rejected: { label: 'Pago rechazado',bg: COLORS.errorLight,   color: COLORS.error   },
 }
 
 /**
@@ -137,13 +141,18 @@ export default function Orders() {
 
       {/* Filters */}
       <div style={styles.toolbar}>
-        <input
-          style={styles.search}
-          type="text"
-          placeholder="Buscar por ID de orden o usuario…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <div style={styles.toolbarRow}>
+          <input
+            style={styles.search}
+            type="text"
+            placeholder="Buscar por ID de orden o usuario…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <span style={styles.count}>
+            {loading ? '…' : `${totalOrders} orden${totalOrders !== 1 ? 'es' : ''}`}
+          </span>
+        </div>
 
         <div style={styles.filterGroup}>
           {STATUS_OPTIONS.map(s => (
@@ -159,10 +168,6 @@ export default function Orders() {
             </button>
           ))}
         </div>
-
-        <span style={styles.count}>
-          {loading ? '…' : `${totalOrders} orden${totalOrders !== 1 ? 'es' : ''}`}
-        </span>
       </div>
 
       {/* Error */}
@@ -410,13 +415,14 @@ const styles = {
     backgroundColor: COLORS.white, color: COLORS.textPrimary, fontSize: 13,
     fontWeight: 600, cursor: 'pointer',
   },
-  toolbar: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' },
+  toolbar: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 },
+  toolbarRow: { display: 'flex', alignItems: 'center', gap: 12 },
   search: {
-    flex: 1, minWidth: 200, height: 40, border: `1.5px solid ${COLORS.border}`, borderRadius: 8,
+    flex: 1, height: 40, border: `1.5px solid ${COLORS.border}`, borderRadius: 8,
     padding: '0 14px', fontSize: 13, outline: 'none', color: COLORS.textPrimary,
     backgroundColor: COLORS.white,
   },
-  filterGroup: { display: 'flex', gap: 6, flexWrap: 'wrap' },
+  filterGroup: { display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 },
   filterBtn: {
     padding: '6px 12px', borderRadius: 20, border: `1px solid ${COLORS.border}`,
     backgroundColor: COLORS.white, color: COLORS.textSecondary, fontSize: 12,
