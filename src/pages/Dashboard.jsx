@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
 import ordersApi from '../api/ordersApi'
+import catalogApi from '../api/catalogApi'
 import { common } from '../styles/common'
 import { dashboardStyles } from '../styles/dashboard'
 
@@ -50,14 +51,16 @@ export default function Dashboard() {
      */
     async function fetchStats() {
       try {
-        const [usersRes, ordersRes] = await Promise.allSettled([
+        const [usersRes, ordersRes, productsRes] = await Promise.allSettled([
           api.get('/users/'),
           ordersApi.get('/orders/admin/all'),
+          catalogApi.get('/products/?status=active&limit=1'),
         ])
 
         // /users/ devuelve { users, total, ... } (paginado)
         const usersData = usersRes.status === 'fulfilled' ? usersRes.value.data : null
         const ordersData = ordersRes.status === 'fulfilled' ? ordersRes.value.data : []
+        const productsTotal = productsRes.status === 'fulfilled' ? (productsRes.value.data?.total ?? '—') : '—'
         const orders = Array.isArray(ordersData) ? ordersData : ordersData?.orders ?? []
 
         const now = new Date()
@@ -67,7 +70,7 @@ export default function Dashboard() {
 
         setStats({
           users: usersData?.total ?? '—',
-          products: '—',
+          products: productsTotal,
           orders: orders.length > 0 ? orders.length : '—',
           revenue: revenue > 0 ? `$${revenue.toLocaleString('es-AR')}` : '$0',
         })
