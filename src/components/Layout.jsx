@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { path: '/users', label: 'Usuarios', icon: '👥' },
   { path: '/products', label: 'Productos', icon: '📦' },
   { path: '/orders', label: 'Órdenes', icon: '🧾' },
+  { path: '/metrics', label: 'Métricas', icon: '📈' },
 ]
 
 /**
