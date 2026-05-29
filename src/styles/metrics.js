@@ -10,7 +10,15 @@ export const metricsStyles = {
   },
   td: { padding: '10px 12px', color: COLORS.textPrimary, verticalAlign: 'middle' },
 
+  headerActions:  { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 },
+  headerControls: { display: 'flex', gap: 12, alignItems: 'center' },
+  exportError:    { fontSize: 12, color: COLORS.error, margin: 0, textAlign: 'right' },
   periodSelector: { display: 'flex', gap: 6, alignItems: 'center' },
+  exportBtn: {
+    padding: '7px 16px', borderRadius: 8, border: 'none',
+    backgroundColor: COLORS.secondary, color: COLORS.white,
+    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  },
   periodBtn: {
     padding: '7px 14px', borderRadius: 8, border: `1px solid ${COLORS.border}`,
     backgroundColor: COLORS.white, color: COLORS.textSecondary,
