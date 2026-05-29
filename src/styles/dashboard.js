@@ -39,16 +39,6 @@ export const dashboardStyles = {
   emptyBox:     { textAlign: 'center', color: COLORS.textSecondary, padding: '32px 0', fontSize: 14 },
   orderId:      { fontFamily: 'monospace', fontSize: 12, color: COLORS.textSecondary },
 
-  // Controles de header (período + exportar)
-  headerActions:  { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 },
-  headerControls: { display: 'flex', gap: 8, alignItems: 'center' },
-  exportBtn: {
-    padding: '6px 16px', borderRadius: 8, border: 'none',
-    backgroundColor: COLORS.secondary, color: COLORS.white,
-    fontSize: 13, fontWeight: 600, cursor: 'pointer',
-  },
-  exportError: { fontSize: 12, color: COLORS.error, margin: 0, textAlign: 'right' },
-
   // Selector de período
   periodSelector: { display: 'flex', gap: 8, alignItems: 'center' },
   periodBtn: {

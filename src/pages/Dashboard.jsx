@@ -48,7 +48,6 @@ export default function Dashboard() {
   const [allOrders, setAllOrders]           = useState([])
   const [loading, setLoading]               = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState(null)
-  const [exportError, setExportError]       = useState(null)
 
   useEffect(() => {
     /**
@@ -114,61 +113,6 @@ export default function Dashboard() {
     }
   }, [stats, allOrders, filteredOrders, selectedPeriod])
 
-  /**
-   * Cambia el período activo y limpia cualquier error de exportación previo.
-   *
-   * @param {number|null} days - Nuevo período en días, o null para deseleccionar.
-   */
-  function handlePeriodChange(days) {
-    setSelectedPeriod(days)
-    setExportError(null)
-  }
-
-  /**
-   * Genera y descarga un archivo CSV con las métricas del período seleccionado.
-   *
-   * Si no hay período activo, actualiza `exportError` con un mensaje (CA3).
-   * De lo contrario, construye el CSV con un resumen del período y el detalle de
-   * cada orden, lo envuelve en un Blob y lo descarga de forma inmediata mediante
-   * un enlace temporal (CA1, CA2).
-   */
-  function handleExport() {
-    if (!selectedPeriod) {
-      setExportError('Debe seleccionar un rango de fechas antes de exportar.')
-      return
-    }
-    setExportError(null)
-
-    const orders      = filteredOrders
-    const revenue     = orders.reduce((sum, o) => sum + (o.total_amount ?? o.total ?? 0), 0)
-    const periodLabel = `Últimos ${selectedPeriod} días`
-
-    const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const row    = cols => cols.map(escape).join(',')
-
-    const lines = [
-      row(['Período', 'Usuarios registrados', 'Órdenes', 'Ingresos']),
-      row([periodLabel, stats.users, orders.length, revenue]),
-      '',
-      row(['ID', 'Usuario', 'Estado', 'Total', 'Fecha']),
-      ...orders.map(o => row([
-        o.id ?? '—',
-        o.user_id ?? o.buyer_id ?? '—',
-        o.status ?? '—',
-        o.total_amount ?? o.total ?? 0,
-        o.created_at ? new Date(o.created_at).toLocaleDateString('es-AR') : '—',
-      ])),
-    ]
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url  = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href     = url
-    link.download = `metricas-${periodLabel.replace(/\s/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
   const recentOrders = allOrders.slice(0, 5)
 
   return (
@@ -179,15 +123,7 @@ export default function Dashboard() {
           <h1 style={styles.title}>Dashboard</h1>
           <p style={styles.subtitle}>Resumen general del sistema</p>
         </div>
-        <div style={styles.headerActions}>
-          <div style={styles.headerControls}>
-            <PeriodSelector selected={selectedPeriod} onChange={handlePeriodChange} />
-            <button onClick={handleExport} style={styles.exportBtn}>
-              Exportar CSV
-            </button>
-          </div>
-          {exportError && <p style={styles.exportError}>{exportError}</p>}
-        </div>
+        <PeriodSelector selected={selectedPeriod} onChange={setSelectedPeriod} />
       </div>
 
       {/* Stat cards */}

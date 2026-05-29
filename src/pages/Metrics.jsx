@@ -10,15 +10,15 @@ import { common } from '../styles/common'
 import { metricsStyles } from '../styles/metrics'
 
 const STATUS_LABELS = {
-  pending_payment:    'Pago pendiente',
-  confirmed:          'Confirmada',
-  in_preparation:     'En preparación',
-  shipped:            'Enviada',
-  delivered:          'Entregada',
-  payment_rejected:   'Pago rechazado',
-  cancelled:          'Cancelada',
+  pending_payment: 'Pago pendiente',
+  confirmed: 'Confirmada',
+  in_preparation: 'En preparación',
+  shipped: 'Enviada',
+  delivered: 'Entregada',
+  payment_rejected: 'Pago rechazado',
+  cancelled: 'Cancelada',
   refund_in_progress: 'Reembolso en proceso',
-  refund_processed:   'Reembolsada',
+  refund_processed: 'Reembolsada',
 }
 
 const PIE_COLORS = [
@@ -27,31 +27,47 @@ const PIE_COLORS = [
 ]
 
 const PERIOD_OPTIONS = [
-  { value: 7,  label: '7 días' },
+  { value: 7, label: '7 días' },
   { value: 30, label: '30 días' },
   { value: 90, label: '90 días' },
 ]
 
+/**
+ * Página de métricas del sistema para administradores.
+ *
+ * Muestra cuatro tarjetas de resumen (usuarios nuevos, órdenes totales, revenue,
+ * órdenes entregadas), un gráfico de torta con la distribución por estado, un gráfico
+ * de línea con la evolución diaria de órdenes, y tablas de top productos y métricas
+ * por categoría. Todos los datos se filtran por el período seleccionado.
+ *
+ * Los datos se obtienen en paralelo con `Promise.allSettled` al montar el componente
+ * y al cambiar el período; el fallo de un endpoint no bloquea los demás.
+ *
+ * @returns {JSX.Element}
+ */
 export default function Metrics() {
-  const [period, setPeriod]         = useState(30)
-  const [loading, setLoading]       = useState(true)
-  const [usersData, setUsersData]   = useState(null)
+  const [period, setPeriod] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [exportError, setExportError] = useState(null)
+  const [usersData, setUsersData] = useState(null)
   const [ordersData, setOrdersData] = useState(null)
   const [revenueData, setRevenueData] = useState(null)
   const [topProducts, setTopProducts] = useState([])
-  const [byCategory, setByCategory]   = useState([])
+  const [byCategory, setByCategory] = useState([])
 
   useEffect(() => {
+    const q = period ? `days=${period}` : ''
+
     async function fetchMetrics() {
       setLoading(true)
       try {
         const [usersRes, ordersRes, revenueRes, topProductsRes, byCategoryRes] =
           await Promise.allSettled([
-            api.get(`/admin/metrics/users?days=${period}`),
-            ordersApi.get(`/admin/metrics/orders?days=${period}`),
-            ordersApi.get(`/admin/metrics/revenue?days=${period}`),
-            ordersApi.get(`/admin/metrics/top-products?days=${period}&limit=10`),
-            ordersApi.get(`/admin/metrics/by-category?days=${period}`),
+            api.get(`/admin/metrics/users${q ? `?${q}` : ''}`),
+            ordersApi.get(`/admin/metrics/orders${q ? `?${q}` : ''}`),
+            ordersApi.get(`/admin/metrics/revenue${q ? `?${q}` : ''}`),
+            ordersApi.get(`/admin/metrics/top-products?${q ? `${q}&` : ''}limit=10`),
+            ordersApi.get(`/admin/metrics/by-category${q ? `?${q}` : ''}`),
           ])
 
         setUsersData(usersRes.status === 'fulfilled' ? usersRes.value.data : null)
@@ -68,10 +84,96 @@ export default function Metrics() {
     fetchMetrics()
   }, [period])
 
+  /**
+   * Alterna el período activo y limpia el error de exportación pendiente.
+   *
+   * Si el valor recibido ya es el período activo, lo deselecciona (lo pone en null).
+   *
+   * @param {number} value - Valor del período en días (7, 30 o 90).
+   */
+  function handlePeriodChange(value) {
+    setPeriod(prev => (prev === value ? null : value))
+    setExportError(null)
+  }
+
+  /**
+   * Genera y descarga un archivo CSV con todos los datos del panel de métricas
+   * para el período activo.
+   *
+   * El CSV incluye cinco secciones separadas por una línea en blanco:
+   * resumen general, órdenes por estado, evolución diaria, top productos y métricas
+   * por categoría. 
+   *
+   * Si no hay período seleccionado, actualiza `exportError` con un mensaje
+   * y cancela la exportación.
+   */
+  function handleExport() {
+    if (!period) {
+      setExportError('Debe seleccionar un rango de fechas antes de exportar.')
+      return
+    }
+    setExportError(null)
+
+    const periodLabel = `Últimos ${period} días`
+    const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const row = cols => cols.map(escape).join(',')
+
+    const lines = [
+      // Resumen general
+      row(['Período', 'Usuarios nuevos', 'Órdenes totales', 'Revenue', 'Órdenes entregadas']),
+      row([
+        periodLabel,
+        usersData?.new_users ?? '—',
+        ordersData?.total ?? '—',
+        revenueData?.total_revenue != null
+          ? revenueData.total_revenue
+          : '—',
+        ordersData?.by_status?.delivered ?? '—',
+      ]),
+      '',
+
+      // Órdenes por estado
+      row(['Estado', 'Cantidad']),
+      ...Object.entries(ordersData?.by_status ?? {})
+        .map(([key, qty]) => row([STATUS_LABELS[key] ?? key, qty])),
+      '',
+
+      // Evolución diaria
+      row(['Fecha', 'Órdenes']),
+      ...(ordersData?.daily ?? []).map(d => row([d.date, d.count])),
+      '',
+
+      // Top productos
+      row(['Producto', 'Categoría', 'Unidades vendidas']),
+      ...topProducts.map(p => row([
+        p.product_name ?? '—',
+        p.category_label ?? p.category_slug ?? '—',
+        p.units_sold ?? '—',
+      ])),
+      '',
+
+      // Por categoría
+      row(['Categoría', 'Órdenes', 'Revenue']),
+      ...byCategory.map(c => row([
+        c.category_label ?? c.category_slug ?? '—',
+        c.order_count ?? '—',
+        c.total_revenue != null ? c.total_revenue : '—',
+      ])),
+    ]
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `metricas-${periodLabel.replace(/\s/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const pieData = ordersData?.by_status
     ? Object.entries(ordersData.by_status)
-        .filter(([, v]) => v > 0)
-        .map(([key, value]) => ({ name: STATUS_LABELS[key] ?? key, value }))
+      .filter(([, v]) => v > 0)
+      .map(([key, value]) => ({ name: STATUS_LABELS[key] ?? key, value }))
     : []
 
   const lineData = ordersData?.daily ?? []
@@ -120,19 +222,27 @@ export default function Metrics() {
           <h1 style={styles.title}>Métricas</h1>
           <p style={styles.subtitle}>Análisis y estadísticas del sistema</p>
         </div>
-        <div style={styles.periodSelector}>
-          {PERIOD_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              style={{
-                ...styles.periodBtn,
-                ...(period === opt.value ? styles.periodBtnActive : {}),
-              }}
-              onClick={() => setPeriod(opt.value)}
-            >
-              {opt.label}
+        <div style={styles.headerActions}>
+          <div style={styles.headerControls}>
+            <div style={styles.periodSelector}>
+              {PERIOD_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  style={{
+                    ...styles.periodBtn,
+                    ...(period === opt.value ? styles.periodBtnActive : {}),
+                  }}
+                  onClick={() => handlePeriodChange(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <button onClick={handleExport} disabled={loading} style={styles.exportBtn}>
+              Exportar CSV
             </button>
-          ))}
+          </div>
+          {exportError && <p style={styles.exportError}>{exportError}</p>}
         </div>
       </div>
 
