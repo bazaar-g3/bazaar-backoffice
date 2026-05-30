@@ -39,6 +39,18 @@ export const dashboardStyles = {
   emptyBox:     { textAlign: 'center', color: COLORS.textSecondary, padding: '32px 0', fontSize: 14 },
   orderId:      { fontFamily: 'monospace', fontSize: 12, color: COLORS.textSecondary },
 
+  // Selector de período
+  periodSelector: { display: 'flex', gap: 8, alignItems: 'center' },
+  periodBtn: {
+    padding: '6px 14px', borderRadius: 8, border: `1px solid ${COLORS.border}`,
+    backgroundColor: COLORS.white, color: COLORS.textSecondary,
+    fontSize: 13, fontWeight: 500, cursor: 'pointer',
+  },
+  periodBtnActive: {
+    backgroundColor: COLORS.primary, color: COLORS.white,
+    borderColor: COLORS.primary,
+  },
+
   // Gráficos
   chartsRow:        { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 },
   chartCard:        { backgroundColor: COLORS.white, borderRadius: 12, padding: '20px 22px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)' },

@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import Users from './pages/Users.jsx'
 import Orders from './pages/Orders.jsx'
 import Products from './pages/Products.jsx'
+import Metrics from './pages/Metrics.jsx'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
                   <Route path="/users"     element={<Users />} />
                   <Route path="/orders"    element={<Orders />} />
                   <Route path="/products"  element={<Products />} />
+                  <Route path="/metrics"  element={<Metrics />} />
                   <Route path="/"          element={<Navigate to="/dashboard" replace />} />
                   <Route path="*"          element={<Navigate to="/dashboard" replace />} />
                 </Routes>
