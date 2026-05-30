@@ -202,7 +202,7 @@ export default function Metrics() {
       color: COLORS.primary,
       bg: COLORS.primaryLight,
       value: revenueData?.total_revenue != null
-        ? `$${revenueData.total_revenue.toLocaleString('es-AR')}`
+        ? `$${parseFloat(revenueData.total_revenue).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
         : '—',
     },
     {
