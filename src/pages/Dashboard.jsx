@@ -109,7 +109,7 @@ export default function Dashboard() {
    */
   const periodStats = useMemo(() => {
     const orders  = selectedPeriod ? filteredOrders : allOrders
-    const revenue = orders.reduce((sum, o) => sum + (o.total_amount ?? o.total ?? 0), 0)
+    const revenue = orders.reduce((sum, o) => sum + Number(o.total_amount ?? o.total ?? 0), 0)
     return {
       ...stats,
       orders:  orders.length > 0 ? orders.length : '—',
