@@ -47,6 +47,7 @@ const PERIODS = [
 export default function Dashboard() {
   const [stats, setStats]                   = useState({ users: '—', products: '—' })
   const [allOrders, setAllOrders]           = useState([])
+  const [totalOrders, setTotalOrders]       = useState(0)
   const [loading, setLoading]               = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState(null)
 
@@ -74,9 +75,11 @@ export default function Dashboard() {
         const ordersData = ordersRes.status === 'fulfilled' ? ordersRes.value.data : []
         const productsTotal = productsRes.status === 'fulfilled' ? (productsRes.value.data?.total ?? '—') : '—'
         const orders = Array.isArray(ordersData) ? ordersData : ordersData?.orders ?? []
+        const total  = Array.isArray(ordersData) ? ordersData.length : (ordersData?.total ?? orders.length)
 
         setStats({ users: usersData?.total ?? '—', products: productsTotal })
         setAllOrders(orders)
+        setTotalOrders(total)
 
       } catch {
         // keep defaults
@@ -108,14 +111,15 @@ export default function Dashboard() {
    * @type {{ users: string|number, products: string|number, orders: string|number, revenue: string }}
    */
   const periodStats = useMemo(() => {
-    const orders  = selectedPeriod ? filteredOrders : allOrders
-    const revenue = orders.reduce((sum, o) => sum + Number(o.total_amount ?? o.total ?? 0), 0)
+    const orders       = selectedPeriod ? filteredOrders : allOrders
+    const ordersCount  = selectedPeriod ? filteredOrders.length : totalOrders
+    const revenue      = orders.reduce((sum, o) => sum + Number(o.total_amount ?? o.total ?? 0), 0)
     return {
       ...stats,
-      orders:  orders.length > 0 ? orders.length : '—',
+      orders:  ordersCount > 0 ? ordersCount : '—',
       revenue: `$${revenue.toLocaleString('es-AR')}`,
     }
-  }, [stats, allOrders, filteredOrders, selectedPeriod])
+  }, [stats, allOrders, filteredOrders, selectedPeriod, totalOrders])
 
   const recentOrders = allOrders.slice(0, 5)
 
