@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
 import ordersApi from '../api/ordersApi'
@@ -6,63 +6,19 @@ import catalogApi from '../api/catalogApi'
 import { common } from '../styles/common'
 import { dashboardStyles } from '../styles/dashboard'
 
-/**
- * Configuración estática de las tarjetas de estadísticas del dashboard.
- * Cada entrada define la clave del dato en el estado `stats`, la etiqueta visible,
- * el ícono y los colores de fondo/texto del ícono.
- *
- * @type {Array<{ key: string, label: string, icon: string, color: string, bg: string }>}
- */
 const STAT_CARDS = [
   { key: 'users',    label: 'Usuarios registrados', icon: '👥', color: COLORS.info,    bg: COLORS.infoLight    },
   { key: 'products', label: 'Productos activos',     icon: '📦', color: COLORS.success, bg: COLORS.successLight },
-  { key: 'orders',   label: 'Órdenes del período',   icon: '🧾', color: COLORS.warning, bg: COLORS.warningLight },
-  { key: 'revenue',  label: 'Ingresos del período',  icon: '💰', color: COLORS.primary, bg: COLORS.primaryLight },
+  { key: 'orders',   label: 'Total de órdenes',      icon: '🧾', color: COLORS.warning, bg: COLORS.warningLight },
+  { key: 'revenue',  label: 'Ingresos totales',      icon: '💰', color: COLORS.primary, bg: COLORS.primaryLight },
 ]
 
-/**
- * Períodos predefinidos disponibles para filtrar métricas.
- * Seleccionar un período activo lo deselecciona (toggle).
- *
- * @type {Array<{ days: number, label: string }>}
- */
-const PERIODS = [
-  { days: 7,  label: '7 días'  },
-  { days: 30, label: '30 días' },
-  { days: 90, label: '90 días' },
-]
-
-/**
- * Página principal del panel de administración.
- *
- * Muestra cuatro tarjetas de resumen (usuarios, productos, órdenes, ingresos),
- * un selector de período que filtra órdenes y estadísticas derivadas,
- * una tabla con las últimas cinco órdenes del sistema y dos placeholders para gráficos futuros.
- *
- * Los datos se obtienen en paralelo al montar el componente usando `Promise.allSettled`,
- * de modo que el fallo de uno de los endpoints no bloquea la visualización del otro.
- *
- * @returns {JSX.Element} Vista completa del dashboard con stats, selector de período, tabla y placeholders de gráficos.
- */
 export default function Dashboard() {
-  const [stats, setStats]                   = useState({ users: '—', products: '—' })
-  const [allOrders, setAllOrders]           = useState([])
-  const [totalOrders, setTotalOrders]       = useState(0)
-  const [loading, setLoading]               = useState(true)
-  const [selectedPeriod, setSelectedPeriod] = useState(null)
+  const [stats, setStats]       = useState({ users: '—', products: '—', orders: '—', revenue: '—' })
+  const [allOrders, setAllOrders] = useState([])
+  const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
-    /**
-     * Obtiene los datos estadísticos del sistema en paralelo.
-     *
-     * Llama a GET /users/ y GET /orders/admin/all de forma concurrente.
-     * Si alguno falla, su resultado se descarta y los demás datos siguen mostrándose.
-     * Almacena todas las órdenes en `allOrders`; las estadísticas derivadas de órdenes
-     * se calculan en `periodStats` según el período seleccionado.
-     *
-     * @async
-     * @returns {Promise<void>}
-     */
     async function fetchStats() {
       try {
         const [usersRes, ordersRes, productsRes] = await Promise.allSettled([
@@ -71,16 +27,21 @@ export default function Dashboard() {
           catalogApi.get('/products/?status=active&limit=1'),
         ])
 
-        const usersData  = usersRes.status  === 'fulfilled' ? usersRes.value.data  : null
-        const ordersData = ordersRes.status === 'fulfilled' ? ordersRes.value.data : []
-        const productsTotal = productsRes.status === 'fulfilled' ? (productsRes.value.data?.total ?? '—') : '—'
-        const orders = Array.isArray(ordersData) ? ordersData : ordersData?.orders ?? []
-        const total  = Array.isArray(ordersData) ? ordersData.length : (ordersData?.total ?? orders.length)
+        const usersData     = usersRes.status     === 'fulfilled' ? usersRes.value.data     : null
+        const ordersData    = ordersRes.status    === 'fulfilled' ? ordersRes.value.data    : {}
+        const productsTotal = productsRes.status  === 'fulfilled' ? (productsRes.value.data?.total ?? '—') : '—'
 
-        setStats({ users: usersData?.total ?? '—', products: productsTotal })
+        const orders      = Array.isArray(ordersData) ? ordersData : (ordersData?.orders ?? [])
+        const totalOrders = Array.isArray(ordersData) ? ordersData.length : (ordersData?.total ?? orders.length)
+        const revenue     = orders.reduce((sum, o) => sum + Number(o.total_amount ?? o.total ?? 0), 0)
+
         setAllOrders(orders)
-        setTotalOrders(total)
-
+        setStats({
+          users:    usersData?.total ?? '—',
+          products: productsTotal,
+          orders:   totalOrders > 0 ? totalOrders : '—',
+          revenue:  `$${revenue.toLocaleString('es-AR')}`,
+        })
       } catch {
         // keep defaults
       } finally {
@@ -89,37 +50,6 @@ export default function Dashboard() {
     }
     fetchStats()
   }, [])
-
-  /**
-   * Órdenes filtradas según el período seleccionado.
-   * Si no hay período activo, devuelve todas las órdenes.
-   *
-   * @type {Array<object>}
-   */
-  const filteredOrders = useMemo(() => {
-    if (!selectedPeriod || allOrders.length === 0) return allOrders
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - selectedPeriod)
-    return allOrders.filter(o => new Date(o.created_at) >= cutoff)
-  }, [allOrders, selectedPeriod])
-
-  /**
-   * Estadísticas derivadas de las órdenes del período activo.
-   * `orders` y `revenue` se recalculan al cambiar el período; `users` y `products`
-   * no dependen del filtro temporal.
-   *
-   * @type {{ users: string|number, products: string|number, orders: string|number, revenue: string }}
-   */
-  const periodStats = useMemo(() => {
-    const orders       = selectedPeriod ? filteredOrders : allOrders
-    const ordersCount  = selectedPeriod ? filteredOrders.length : totalOrders
-    const revenue      = orders.reduce((sum, o) => sum + Number(o.total_amount ?? o.total ?? 0), 0)
-    return {
-      ...stats,
-      orders:  ordersCount > 0 ? ordersCount : '—',
-      revenue: `$${revenue.toLocaleString('es-AR')}`,
-    }
-  }, [stats, allOrders, filteredOrders, selectedPeriod, totalOrders])
 
   const recentOrders = allOrders.slice(0, 5)
 
@@ -131,7 +61,6 @@ export default function Dashboard() {
           <h1 style={styles.title}>Dashboard</h1>
           <p style={styles.subtitle}>Resumen general del sistema</p>
         </div>
-        <PeriodSelector selected={selectedPeriod} onChange={setSelectedPeriod} />
       </div>
 
       {/* Stat cards */}
@@ -143,7 +72,7 @@ export default function Dashboard() {
             </div>
             <div>
               <div style={styles.statValue}>
-                {loading ? <span style={styles.skeleton} /> : periodStats[card.key]}
+                {loading ? <span style={styles.skeleton} /> : stats[card.key]}
               </div>
               <div style={styles.statLabel}>{card.label}</div>
             </div>
@@ -195,53 +124,15 @@ export default function Dashboard() {
   )
 }
 
-/**
- * Selector de período predefinido para filtrar métricas del dashboard.
- *
- * Renderiza botones para cada período disponible en `PERIODS`.
- * Hacer clic en el período activo lo deselecciona (toggle).
- *
- * @param {{ selected: number|null, onChange: (days: number|null) => void }} props
- * @param {number|null} props.selected - Cantidad de días del período activo, o null si no hay selección.
- * @param {Function}    props.onChange - Callback invocado con el nuevo valor de período (o null al deseleccionar).
- * @returns {JSX.Element}
- */
-function PeriodSelector({ selected, onChange }) {
-  return (
-    <div style={styles.periodSelector}>
-      {PERIODS.map(({ days, label }) => (
-        <button
-          key={days}
-          onClick={() => onChange(selected === days ? null : days)}
-          style={{
-            ...styles.periodBtn,
-            ...(selected === days ? styles.periodBtnActive : {}),
-          }}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-/**
- * Muestra un badge de color según el estado de una orden.
- *
- * Mapea los valores `pending`, `paid`, `cancelled` y `delivered` a etiquetas en español
- * con colores semánticos (amarillo, verde, rojo, azul). Si el estado no está en el mapa,
- * se muestra el valor crudo con estilo neutro.
- *
- * @param {{ status: string }} props
- * @param {string} props.status - Estado de la orden (ej: 'pending', 'paid').
- * @returns {JSX.Element} Etiqueta coloreada con el estado de la orden.
- */
 function StatusBadge({ status }) {
   const map = {
-    pending:   { label: 'Pendiente', bg: COLORS.warningLight, color: COLORS.warning },
-    paid:      { label: 'Pagada',    bg: COLORS.successLight, color: COLORS.success  },
-    cancelled: { label: 'Cancelada', bg: COLORS.errorLight,   color: COLORS.error    },
-    delivered: { label: 'Entregada', bg: COLORS.infoLight,    color: COLORS.info     },
+    pending:        { label: 'Pendiente',     bg: COLORS.warningLight, color: COLORS.warning },
+    paid:           { label: 'Pagada',        bg: COLORS.successLight, color: COLORS.success  },
+    cancelled:      { label: 'Cancelada',     bg: COLORS.errorLight,   color: COLORS.error    },
+    delivered:      { label: 'Entregada',     bg: COLORS.infoLight,    color: COLORS.info     },
+    confirmed:      { label: 'Confirmada',    bg: COLORS.successLight, color: COLORS.success  },
+    shipped:        { label: 'Enviada',       bg: COLORS.infoLight,    color: COLORS.info     },
+    in_preparation: { label: 'En preparación',bg: COLORS.warningLight, color: COLORS.warning  },
   }
   const s = map[status] ?? { label: status ?? '—', bg: '#f1f5f9', color: COLORS.textSecondary }
   return (
