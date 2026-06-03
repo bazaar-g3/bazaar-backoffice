@@ -187,22 +187,6 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-
-      {/* Placeholder charts */}
-      <div style={styles.chartsRow}>
-        <div style={styles.chartCard}>
-          <h3 style={styles.chartTitle}>Ventas por período</h3>
-          <div style={styles.chartPlaceholder}>
-            <span style={styles.chartHint}>📈 Próximamente: gráfico de ventas</span>
-          </div>
-        </div>
-        <div style={styles.chartCard}>
-          <h3 style={styles.chartTitle}>Órdenes por estado</h3>
-          <div style={styles.chartPlaceholder}>
-            <span style={styles.chartHint}>🍩 Próximamente: gráfico de estados</span>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
