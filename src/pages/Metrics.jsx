@@ -63,7 +63,7 @@ export default function Metrics() {
       try {
         const [usersRes, ordersRes, revenueRes, topProductsRes, byCategoryRes] =
           await Promise.allSettled([
-            api.get(`/admin/metrics/users${q ? `?${q}` : ''}`),
+            api.get(`/users/admin/metrics${q ? `?${q}` : ''}`),
             ordersApi.get(`/admin/metrics/orders${q ? `?${q}` : ''}`),
             ordersApi.get(`/admin/metrics/revenue${q ? `?${q}` : ''}`),
             ordersApi.get(`/admin/metrics/top-products?${q ? `${q}&` : ''}limit=10`),
