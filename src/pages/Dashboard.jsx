@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Users, Package, ClipboardList, DollarSign } from 'lucide-react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
 import ordersApi from '../api/ordersApi'
@@ -8,10 +9,10 @@ import { common } from '../styles/common'
 import { dashboardStyles } from '../styles/dashboard'
 
 const STAT_CARDS = [
-  { key: 'users',    label: 'Usuarios registrados', icon: '👥', color: COLORS.info,    bg: COLORS.infoLight    },
-  { key: 'products', label: 'Productos activos',     icon: '📦', color: COLORS.success, bg: COLORS.successLight },
-  { key: 'orders',   label: 'Total de órdenes',      icon: '🧾', color: COLORS.warning, bg: COLORS.warningLight },
-  { key: 'revenue',  label: 'Ingresos totales',      icon: '💰', color: COLORS.primary, bg: COLORS.primaryLight },
+  { key: 'users',    label: 'Usuarios registrados', icon: <Users size={20} />,       color: COLORS.info,    bg: COLORS.infoLight    },
+  { key: 'products', label: 'Productos activos',     icon: <Package size={20} />,     color: COLORS.success, bg: COLORS.successLight },
+  { key: 'orders',   label: 'Total de órdenes',      icon: <ClipboardList size={20} />, color: COLORS.warning, bg: COLORS.warningLight },
+  { key: 'revenue',  label: 'Ingresos totales',      icon: <DollarSign size={20} />,  color: COLORS.primary, bg: COLORS.primaryLight },
 ]
 
 export default function Dashboard() {

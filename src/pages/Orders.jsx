@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
+import { RefreshCw, ChevronUp, ChevronDown } from 'lucide-react'
 import ordersApi from '../api/ordersApi'
 import { ORDER_STATUS_CONFIG } from '../constants/statusLabels'
 import OrderStatusBadge from '../components/Badges/OrderStatusBadge'
 import PaymentBadge from '../components/Badges/PaymentBadge'
+import OrderDetail from '../components/Modals/OrderDetail'
 import { common } from '../styles/common'
 import { ordersStyles } from '../styles/orders'
 
@@ -127,8 +129,8 @@ export default function Orders() {
           <h1 style={styles.title}>Órdenes</h1>
           <p style={styles.subtitle}>Soporte técnico — todas las órdenes del sistema</p>
         </div>
-        <button style={styles.refreshBtn} onClick={() => fetchOrders(page, statusFilter)} disabled={loading}>
-          🔄 Actualizar
+        <button style={{ ...styles.refreshBtn, display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => fetchOrders(page, statusFilter)} disabled={loading}>
+          <RefreshCw size={14} /> Actualizar
         </button>
       </div>
 
@@ -212,7 +214,7 @@ export default function Orders() {
                           : '—'}
                       </td>
                       <td style={styles.td}>
-                        <span style={styles.expandIcon}>{expandedId === order.id ? '▲' : '▼'}</span>
+                        <span style={styles.expandIcon}>{expandedId === order.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</span>
                       </td>
                     </tr>
 
@@ -263,108 +265,6 @@ export default function Orders() {
   )
 }
 
-/**
- * Panel de detalle de una orden, mostrado como fila expandida en la tabla.
- *
- * Presenta en una grilla los campos principales de la orden (ID completo, usuario,
- * estado de pago, método de pago, dirección de envío, fecha de actualización) y,
- * si existen, la lista de ítems con nombre, cantidad y precio unitario.
- *
- * Normaliza nombres de campo alternativos para compatibilidad con distintos microservicios
- * (ej: `items` vs `order_items`, `product_name` vs `name`, `unit_price` vs `price`).
- *
- * @param {{ order: Object }} props
- * @param {Object} props.order - Objeto de orden con todos sus campos.
- * @returns {JSX.Element} Panel de detalle con grilla de campos e ítems.
- */
-function formatAddress(addr) {
-  if (!addr) return '—'
-  if (typeof addr === 'string') return addr
-  const { calle, altura, departamento, zona, codigo_postal } = addr
-  let s = `${calle} ${altura}`
-  if (departamento) s += ` Dpto. ${departamento}`
-  if (zona) s += `, ${zona}`
-  if (codigo_postal) s += ` (CP ${codigo_postal})`
-  return s
-}
-
-function OrderDetail({ order }) {
-  const items = order.items ?? order.order_items ?? []
-  return (
-    <div style={styles.detailBox}>
-      <div style={styles.detailGrid}>
-        <DetailField label="ID completo" value={order.id} mono />
-        <DetailField label="Comprador" value={order.user_id ?? order.buyer_id} mono />
-        <DetailField label="Estado" value={order.status ?? '—'} />
-        <DetailField label="Total" value={order.total != null ? `$${Number(order.total).toLocaleString('es-AR')}` : '—'} />
-        <DetailField label="Dirección" value={formatAddress(order.delivery_address ?? order.shipping_address)} />
-        <DetailField label="Fecha" value={order.created_at ? new Date(order.created_at).toLocaleString('es-AR') : '—'} />
-      </div>
-
-      {items.length > 0 && (
-        <div style={styles.itemsSection}>
-          <div style={styles.itemsTitle}>Ítems</div>
-          {items.map((item, i) => (
-            <div key={i} style={styles.itemRow}>
-              <span>{item.product_name ?? item.name ?? `Producto #${item.product_id ?? i}`}</span>
-              <span style={styles.itemQty}>x{item.quantity ?? 1}</span>
-              <span>${(item.unit_price ?? item.price ?? 0).toLocaleString('es-AR')}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {(order.status_history ?? []).length > 0 && (
-        <div style={styles.itemsSection}>
-          <div style={styles.itemsTitle}>Historial de estados</div>
-          {(order.status_history ?? []).map((h, i) => (
-            <div key={i} style={styles.historyRow}>
-              <StatusBadge status={h.status} />
-              <span style={styles.historyDate}>
-                {h.changed_at ? new Date(h.changed_at).toLocaleString('es-AR') : '—'}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {(order.fulfillments ?? []).length > 0 && (
-        <div style={styles.itemsSection}>
-          <div style={styles.itemsTitle}>Vendedores</div>
-          {(order.fulfillments ?? []).map((f, i) => (
-            <div key={i} style={styles.fulfillmentRow}>
-              <span style={styles.mono}>ID: {f.seller_id}</span>
-              <StatusBadge status={f.status} />
-              {f.tracking_code && (
-                <span style={styles.trackingCode}>Seguimiento: {f.tracking_code}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * Campo de detalle individual con etiqueta y valor.
- *
- * @param {{ label: string, value: any, mono?: boolean }} props
- * @param {string} props.label - Etiqueta del campo (ej: "Método de pago").
- * @param {*} props.value - Valor a mostrar; si es `null` o `undefined` se muestra `'—'`.
- * @param {boolean} [props.mono=false] - Si `true`, aplica fuente monoespaciada al valor (útil para IDs).
- * @returns {JSX.Element} Par etiqueta/valor apilados verticalmente.
- */
-function DetailField({ label, value, mono }) {
-  return (
-    <div style={styles.detailField}>
-      <div style={styles.detailLabel}>{label}</div>
-      <div style={{ ...styles.detailValue, ...(mono ? { fontFamily: 'monospace', fontSize: 12 } : {}) }}>
-        {value ?? '—'}
-      </div>
-    </div>
-  )
-}
 
 
 const styles = { ...common, ...ordersStyles }

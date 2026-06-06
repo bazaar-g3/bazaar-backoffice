@@ -3,6 +3,7 @@ import {
   PieChart, Pie, Cell, Tooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from 'recharts'
+import { Users, ClipboardList, DollarSign, CheckCircle } from 'lucide-react'
 import { COLORS } from '../constants/colors'
 import { ORDER_STATUS_CONFIG } from '../constants/statusLabels'
 import api from '../api/api'
@@ -170,7 +171,7 @@ export default function Metrics() {
     {
       key: 'new_users',
       label: 'Usuarios nuevos',
-      icon: '👥',
+      icon: <Users size={20} />,
       color: COLORS.info,
       bg: COLORS.infoLight,
       value: usersData?.new_users ?? '—',
@@ -178,7 +179,7 @@ export default function Metrics() {
     {
       key: 'total_orders',
       label: 'Órdenes totales',
-      icon: '🧾',
+      icon: <ClipboardList size={20} />,
       color: COLORS.warning,
       bg: COLORS.warningLight,
       value: ordersData?.total ?? '—',
@@ -186,7 +187,7 @@ export default function Metrics() {
     {
       key: 'revenue',
       label: 'Revenue del período',
-      icon: '💰',
+      icon: <DollarSign size={20} />,
       color: COLORS.primary,
       bg: COLORS.primaryLight,
       value: revenueData?.total_revenue != null
@@ -196,7 +197,7 @@ export default function Metrics() {
     {
       key: 'delivered',
       label: 'Órdenes entregadas',
-      icon: '✅',
+      icon: <CheckCircle size={20} />,
       color: COLORS.success,
       bg: COLORS.successLight,
       value: ordersData?.by_status?.delivered ?? '—',

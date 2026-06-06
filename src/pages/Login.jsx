@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Store, AlertTriangle } from 'lucide-react'
 import api from '../api/api'
 import { loginStyles } from '../styles/login'
 import { parseJwtPayload } from '../utils/jwt'
@@ -74,7 +75,7 @@ export default function Login() {
     <div style={styles.page}>
       <div style={styles.card}>
         <div style={styles.logoArea}>
-          <span style={styles.logoIcon}>🏪</span>
+          <span style={styles.logoIcon}><Store size={28} /></span>
           <div>
             <div style={styles.logoTitle}>BAZAAR</div>
             <div style={styles.logoSub}>Panel de Administración</div>
@@ -85,7 +86,7 @@ export default function Login() {
 
         {error && (
           <div style={styles.errorBox}>
-            <span style={styles.errorIcon}>⚠️</span> {error}
+            <AlertTriangle size={14} style={{ marginRight: 6, flexShrink: 0 }} /> {error}
           </div>
         )}
 

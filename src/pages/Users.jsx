@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { COLORS } from '../constants/colors'
+import { RefreshCw, Search, X, AlertTriangle, Ban, CheckCircle, Info } from 'lucide-react'
 import api from '../api/api'
+import ConfirmBlockModal from '../components/Modals/ConfirmBlockModal'
 import RoleBadge from '../components/Badges/RoleBadge'
 import UserStatusBadge from '../components/Badges/UserStatusBadge'
 import { common } from '../styles/common'
@@ -219,8 +220,8 @@ export default function Users() {
 
       {/* Warning toast */}
       {warning && (
-        <div style={styles.warningToast}>
-          ⚠️ {warning}
+        <div style={{ ...styles.warningToast, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <AlertTriangle size={14} /> {warning}
         </div>
       )}
 
@@ -230,15 +231,15 @@ export default function Users() {
           <h1 style={styles.title}>Usuarios</h1>
           <p style={styles.subtitle}>Gestión de cuentas registradas</p>
         </div>
-        <button style={styles.refreshBtn} onClick={fetchUsers} disabled={loading}>
-          🔄 Actualizar
+        <button style={{ ...styles.refreshBtn, display: 'flex', alignItems: 'center', gap: 6 }} onClick={fetchUsers} disabled={loading}>
+          <RefreshCw size={14} /> Actualizar
         </button>
       </div>
 
       {/* Toolbar: búsqueda + filtro de rol + contador */}
       <div style={styles.toolbar}>
         <div style={styles.searchWrapper}>
-          <span style={styles.searchIcon}>🔍</span>
+          <span style={styles.searchIcon}><Search size={14} /></span>
           <input
             style={styles.search}
             type="text"
@@ -247,7 +248,7 @@ export default function Users() {
             onChange={e => handleSearchChange(e.target.value)}
           />
           {search && (
-            <button style={styles.clearBtn} onClick={() => handleSearchChange('')}>✕</button>
+            <button style={styles.clearBtn} onClick={() => handleSearchChange('')}><X size={12} /></button>
           )}
         </div>
 
@@ -332,13 +333,16 @@ export default function Users() {
                               ...styles.actionBtn,
                               ...(user.isBlocked ? styles.unblockBtn : styles.blockBtn),
                               opacity: actionLoading === user.id ? 0.5 : 1,
+                              display: 'flex', alignItems: 'center', gap: 4,
                             }}
                             onClick={() => toggleBlock(user)}
                             disabled={actionLoading === user.id}
                           >
                             {actionLoading === user.id
                               ? '…'
-                              : user.isBlocked ? '✅ Desbloquear' : '🚫 Bloquear'}
+                              : user.isBlocked
+                                ? <><CheckCircle size={13} /> Desbloquear</>
+                                : <><Ban size={13} /> Bloquear</>}
                           </button>
                         )}
                       </td>
@@ -378,62 +382,20 @@ function AdminBlockedButton() {
       onMouseLeave={() => setTooltipVisible(false)}
     >
       <button
-        style={{ ...styles.actionBtn, ...styles.disabledBtn, cursor: 'not-allowed', opacity: 0.6 }}
+        style={{ ...styles.actionBtn, ...styles.disabledBtn, cursor: 'not-allowed', opacity: 0.6, display: 'flex', alignItems: 'center', gap: 4 }}
         disabled
       >
-        🚫 Bloquear
+        <Ban size={13} /> Bloquear
       </button>
 
       {tooltipVisible && (
         <div style={styles.adminTooltip}>
-          <span style={styles.adminTooltipIcon}>ℹ️</span>
+          <span style={styles.adminTooltipIcon}><Info size={13} /></span>
           No se pueden bloquear cuentas de administrador
           {/* Flecha apuntando hacia abajo */}
           <div style={styles.adminTooltipArrow} />
         </div>
       )}
-    </div>
-  )
-}
-
-/**
- * Modal de confirmación de bloqueo centrado en la pantalla con overlay oscuro.
- *
- * @param {{ user: object, onConfirm: () => void, onCancel: () => void }} props
- * @param {object}   props.user      - Usuario que se va a bloquear.
- * @param {Function} props.onConfirm - Callback al confirmar el bloqueo.
- * @param {Function} props.onCancel  - Callback al cancelar.
- * @returns {JSX.Element}
- */
-function ConfirmBlockModal({ user, onConfirm, onCancel }) {
-  const displayName = user.fullName ?? user.email ?? `Usuario #${user.id}`
-
-  return (
-    <div style={styles.overlay} onClick={onCancel}>
-      {/* stopPropagation para que click dentro del modal no cierre el overlay */}
-      <div style={styles.modal} onClick={e => e.stopPropagation()}>
-        <div style={styles.modalWarningIcon}>⚠️</div>
-
-        <h2 style={styles.modalTitle}>¡Atención!</h2>
-
-        <p style={styles.modalBody}>
-          Estás a punto de bloquear la cuenta de{' '}
-          <strong style={{ color: COLORS.textPrimary }}>{displayName}</strong>.
-        </p>
-        <p style={styles.modalSubtext}>
-          El usuario no podrá iniciar sesión y sus productos serán ocultados del catálogo.
-        </p>
-        <p style={styles.modalQuestion}>¿Estás seguro?</p>
-
-        <div style={styles.modalActions}>
-          <button style={styles.cancelBtn} onClick={onCancel}>
-            Cancelar
-          </button>
-          <button style={styles.confirmBtn} onClick={onConfirm}>
-            🚫 Bloquear
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
