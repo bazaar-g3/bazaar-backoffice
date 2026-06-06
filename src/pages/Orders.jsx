@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { COLORS } from '../constants/colors'
 import ordersApi from '../api/ordersApi'
+import { ORDER_STATUS_CONFIG } from '../constants/statusLabels'
+import OrderStatusBadge from '../components/Badges/OrderStatusBadge'
+import PaymentBadge from '../components/Badges/PaymentBadge'
 import { common } from '../styles/common'
 import { ordersStyles } from '../styles/orders'
 
@@ -20,14 +22,6 @@ const STATUS_OPTIONS = [
   'payment_rejected',
 ]
 
-const STATUS_LABELS = {
-  pending_payment: { label: 'Pend. de pago', bg: COLORS.warningLight, color: COLORS.warning },
-  confirmed: { label: 'Confirmada', bg: COLORS.infoLight, color: COLORS.info },
-  in_preparation: { label: 'En preparación', bg: COLORS.infoLight, color: COLORS.info },
-  shipped: { label: 'Enviada', bg: COLORS.primaryLight, color: COLORS.primary },
-  delivered: { label: 'Entregada', bg: COLORS.successLight, color: COLORS.success },
-  payment_rejected: { label: 'Pago rechazado', bg: COLORS.errorLight, color: COLORS.error },
-}
 
 /**
  * Página de visualización de órdenes del sistema para soporte técnico (solo lectura).
@@ -163,7 +157,7 @@ export default function Orders() {
               }}
               onClick={() => handleStatusChange(s)}
             >
-              {s === 'Todos' ? 'Todos' : (STATUS_LABELS[s]?.label ?? s)}
+              {s === 'Todos' ? 'Todos' : (ORDER_STATUS_CONFIG[s]?.label ?? s)}
             </button>
           ))}
         </div>
@@ -204,7 +198,7 @@ export default function Orders() {
                         <span style={styles.mono}>{String(order.user_id ?? order.buyer_id ?? '—').slice(0, 8)}</span>
                       </td>
                       <td style={styles.td}>
-                        <StatusBadge status={order.status} />
+                        <OrderStatusBadge status={order.status} />
                       </td>
                       <td style={styles.td}>
                         ${(order.total_amount ?? order.total ?? 0).toLocaleString('es-AR')}
@@ -372,36 +366,5 @@ function DetailField({ label, value, mono }) {
   )
 }
 
-/**
- * Muestra un badge de color según el estado de una orden.
- *
- * @param {{ status: string }} props
- * @param {string} props.status - Estado de la orden (ej: `'pending'`, `'paid'`, `'cancelled'`, `'delivered'`).
- * @returns {JSX.Element} Badge coloreado con la etiqueta del estado en español.
- */
-function StatusBadge({ status }) {
-  const s = STATUS_LABELS[status] ?? { label: status ?? '—', bg: '#f1f5f9', color: COLORS.textSecondary }
-  return <span style={{ ...styles.badge, backgroundColor: s.bg, color: s.color }}>{s.label}</span>
-}
-
-/**
- * Muestra un badge de color según el estado de pago de una orden.
- *
- * Mapea `approved`, `pending` y `rejected` a etiquetas en español con colores semánticos.
- * Para valores desconocidos muestra el valor crudo con estilo neutro.
- *
- * @param {{ status: string }} props
- * @param {string} props.status - Estado de pago (ej: `'approved'`, `'pending'`, `'rejected'`).
- * @returns {JSX.Element} Badge coloreado con el estado de pago.
- */
-function PaymentBadge({ status }) {
-  const map = {
-    approved: { label: 'Aprobado', bg: COLORS.successLight, color: COLORS.success },
-    pending: { label: 'Pendiente', bg: COLORS.warningLight, color: COLORS.warning },
-    rejected: { label: 'Rechazado', bg: COLORS.errorLight, color: COLORS.error },
-  }
-  const s = map[status] ?? { label: status ?? '—', bg: '#f1f5f9', color: COLORS.textSecondary }
-  return <span style={{ ...styles.badge, backgroundColor: s.bg, color: s.color }}>{s.label}</span>
-}
 
 const styles = { ...common, ...ordersStyles }

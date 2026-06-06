@@ -4,22 +4,11 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from 'recharts'
 import { COLORS } from '../constants/colors'
+import { ORDER_STATUS_CONFIG } from '../constants/statusLabels'
 import api from '../api/api'
 import ordersApi from '../api/ordersApi'
 import { common } from '../styles/common'
 import { metricsStyles } from '../styles/metrics'
-
-const STATUS_LABELS = {
-  pending_payment: 'Pago pendiente',
-  confirmed: 'Confirmada',
-  in_preparation: 'En preparación',
-  shipped: 'Enviada',
-  delivered: 'Entregada',
-  payment_rejected: 'Pago rechazado',
-  cancelled: 'Cancelada',
-  refund_in_progress: 'Reembolso en proceso',
-  refund_processed: 'Reembolsada',
-}
 
 const PIE_COLORS = [
   COLORS.primary, COLORS.secondary, COLORS.info, COLORS.success,
@@ -142,7 +131,7 @@ export default function Metrics() {
     downloadCsv(`ordenes-por-estado-${suffix}.csv`, [
       row(['Estado', 'Cantidad']),
       ...Object.entries(ordersData?.by_status ?? {})
-        .map(([key, qty]) => row([STATUS_LABELS[key] ?? key, qty])),
+        .map(([key, qty]) => row([ORDER_STATUS_CONFIG[key]?.label ?? key, qty])),
     ])
 
     downloadCsv(`evolucion-diaria-${suffix}.csv`, [
@@ -172,7 +161,7 @@ export default function Metrics() {
   const pieData = ordersData?.by_status
     ? Object.entries(ordersData.by_status)
       .filter(([, v]) => v > 0)
-      .map(([key, value]) => ({ name: STATUS_LABELS[key] ?? key, value }))
+      .map(([key, value]) => ({ name: ORDER_STATUS_CONFIG[key]?.label ?? key, value }))
     : []
 
   const lineData = ordersData?.daily ?? []

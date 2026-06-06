@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
+import RoleBadge from '../components/Badges/RoleBadge'
+import UserStatusBadge from '../components/Badges/UserStatusBadge'
 import { common } from '../styles/common'
 import { usersStyles } from '../styles/users'
 import { parseJwtPayload } from '../utils/jwt'
@@ -312,7 +314,7 @@ export default function Users() {
                         <RoleBadge isAdmin={user.isAdmin} />
                       </td>
                       <td style={styles.td}>
-                        <StatusBadge blocked={user.isBlocked} />
+                        <UserStatusBadge blocked={user.isBlocked} />
                       </td>
                       <td style={styles.td}>
                         {user.createdAt
@@ -436,31 +438,6 @@ function ConfirmBlockModal({ user, onConfirm, onCancel }) {
   )
 }
 
-/**
- * Muestra un badge indicando si un usuario es administrador o usuario regular.
- *
- * @param {{ isAdmin: boolean }} props
- * @param {boolean} props.isAdmin - `true` si el usuario tiene rol de administrador.
- * @returns {JSX.Element} Badge de color morado para admins o gris para usuarios regulares.
- */
-function RoleBadge({ isAdmin }) {
-  return isAdmin
-    ? <span style={{ ...styles.badge, backgroundColor: COLORS.primaryLight, color: COLORS.primary }}>Admin</span>
-    : <span style={{ ...styles.badge, backgroundColor: '#f1f5f9', color: COLORS.textSecondary }}>Usuario</span>
-}
-
-/**
- * Muestra un badge indicando si un usuario está bloqueado o activo.
- *
- * @param {{ blocked: boolean }} props
- * @param {boolean} props.blocked - `true` si el usuario está bloqueado.
- * @returns {JSX.Element} Badge rojo para "Bloqueado" o verde para "Activo".
- */
-function StatusBadge({ blocked }) {
-  return blocked
-    ? <span style={{ ...styles.badge, backgroundColor: COLORS.errorLight, color: COLORS.error }}>Bloqueado</span>
-    : <span style={{ ...styles.badge, backgroundColor: COLORS.successLight, color: COLORS.success }}>Activo</span>
-}
 
 /**
  * Componente de paginación con navegación anterior/siguiente y botones de página numerados.

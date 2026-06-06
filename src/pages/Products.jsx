@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
 import catalogApi from '../api/catalogApi'
+import StockBadge from '../components/Badges/StockBadge'
+import ProductStatusBadge from '../components/Badges/ProductStatusBadge'
 import { common } from '../styles/common'
 import { productsStyles } from '../styles/products'
 
@@ -318,34 +320,6 @@ function ProductThumb({ src, name }) {
   )
 }
 
-/**
- * Badge de stock con indicadores visuales por nivel de criticidad.
- */
-function StockBadge({ stock }) {
-  if (stock == null) return <span style={{ color: COLORS.textMuted }}>—</span>
-  if (stock === 0)
-    return <span style={{ ...styles.badge, backgroundColor: COLORS.errorLight, color: COLORS.error }}>Sin stock</span>
-  if (stock < 5)
-    return <span style={{ ...styles.badge, backgroundColor: COLORS.warningLight, color: COLORS.warning }}>{stock} uds</span>
-  return <span style={{ color: COLORS.textSecondary, fontSize: 13 }}>{stock} uds</span>
-}
-
-/**
- * Badge de estado del producto que prioriza el flag adminDisabled sobre el estado del vendedor.
- *
- * @param {{ product: Object }} props
- */
-function ProductStatusBadge({ product }) {
-  if (product.adminDisabled) {
-    return <span style={{ ...styles.badge, backgroundColor: COLORS.warningLight, color: COLORS.warning }}>Bloqueado admin</span>
-  }
-  const map = {
-    active:   { label: 'Activo',   bg: COLORS.successLight, color: COLORS.success },
-    disabled: { label: 'Inactivo', bg: '#f1f5f9',           color: COLORS.textSecondary },
-  }
-  const s = map[product.status] ?? { label: product.status ?? '—', bg: '#f1f5f9', color: COLORS.textSecondary }
-  return <span style={{ ...styles.badge, backgroundColor: s.bg, color: s.color }}>{s.label}</span>
-}
 
 /**
  * Controles de paginación: anterior, números de página y siguiente.
