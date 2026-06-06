@@ -3,26 +3,22 @@ import { COLORS } from '../constants/colors'
 import api from '../api/api'
 import { common } from '../styles/common'
 import { usersStyles } from '../styles/users'
+import { parseJwtPayload } from '../utils/jwt'
 
 /** Cantidad de usuarios por página en el listado. */
 const PAGE_SIZE = 20
 
 /**
- * Decodifica el payload de un JWT del localStorage para obtener el ID del admin autenticado.
+ * Obtiene el ID del admin autenticado desde el token JWT del localStorage.
  * Se usa para deshabilitar el botón de bloqueo en la propia fila del admin (CA4).
  *
  * @returns {number | null} ID numérico del admin autenticado, o null si no hay token válido.
  */
 function getAuthenticatedAdminId() {
-  try {
-    const token = localStorage.getItem('token')
-    if (!token) return null
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    const payload = JSON.parse(atob(base64))
-    return payload?.sub ? parseInt(payload.sub, 10) : null
-  } catch {
-    return null
-  }
+  const token = localStorage.getItem('token')
+  if (!token) return null
+  const payload = parseJwtPayload(token)
+  return payload?.sub ? parseInt(payload.sub, 10) : null
 }
 
 /**
@@ -543,9 +539,5 @@ function buildPageList(current, total) {
   }
   return result
 }
-
-// ---------------------------------------------------------------------------
-// Estilos
-// ---------------------------------------------------------------------------
 
 const styles = { ...common, ...usersStyles }

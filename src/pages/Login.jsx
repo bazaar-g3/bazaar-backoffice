@@ -2,22 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/api'
 import { loginStyles } from '../styles/login'
-
-/**
- * Decodifica el payload de un JWT sin verificar la firma para extraer el rol y
- * decidir si el usuario tiene acceso al panel antes de navegar.
- *
- * @param {string} token - JWT en formato header.payload.signature (base64url).
- * @returns {{ sub: string, role: string } | null} Payload decodificado, o null si el token es inválido.
- */
-function parseJwtPayload(token) {
-  try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    return JSON.parse(atob(base64))
-  } catch {
-    return null
-  }
-}
+import { parseJwtPayload } from '../utils/jwt'
 
 /**
  * Página de inicio de sesión del panel de administración.
