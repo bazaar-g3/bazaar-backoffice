@@ -97,12 +97,10 @@ export default function Metrics() {
   }
 
   /**
-   * Genera y descarga un archivo CSV con todos los datos del panel de métricas
-   * para el período activo.
+   * Genera y descarga un CSV por sección de métricas para el período activo.
    *
-   * El CSV incluye cinco secciones separadas por una línea en blanco:
-   * resumen general, órdenes por estado, evolución diaria, top productos y métricas
-   * por categoría. 
+   * Descarga cinco archivos separados: resumen general, órdenes por estado,
+   * evolución diaria, top productos y métricas por categoría.
    *
    * Si no hay período seleccionado, actualiza `exportError` con un mensaje
    * y cancela la exportación.
@@ -115,59 +113,60 @@ export default function Metrics() {
     setExportError(null)
 
     const periodLabel = `Últimos ${period} días`
+    const dateStr = new Date().toISOString().slice(0, 10)
+    const suffix = `${periodLabel.replace(/\s/g, '-')}-${dateStr}`
     const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`
     const row = cols => cols.map(escape).join(',')
 
-    const lines = [
-      // Resumen general
+    function downloadCsv(filename, lines) {
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(url)
+    }
+
+    downloadCsv(`resumen-${suffix}.csv`, [
       row(['Período', 'Usuarios nuevos', 'Órdenes totales', 'Revenue', 'Órdenes entregadas']),
       row([
         periodLabel,
         usersData?.new_users ?? '—',
         ordersData?.total ?? '—',
-        revenueData?.total_revenue != null
-          ? revenueData.total_revenue
-          : '—',
+        revenueData?.total_revenue != null ? revenueData.total_revenue : '—',
         ordersData?.by_status?.delivered ?? '—',
       ]),
-      '',
+    ])
 
-      // Órdenes por estado
+    downloadCsv(`ordenes-por-estado-${suffix}.csv`, [
       row(['Estado', 'Cantidad']),
       ...Object.entries(ordersData?.by_status ?? {})
         .map(([key, qty]) => row([STATUS_LABELS[key] ?? key, qty])),
-      '',
+    ])
 
-      // Evolución diaria
+    downloadCsv(`evolucion-diaria-${suffix}.csv`, [
       row(['Fecha', 'Órdenes']),
       ...(ordersData?.daily ?? []).map(d => row([d.date, d.count])),
-      '',
+    ])
 
-      // Top productos
+    downloadCsv(`top-productos-${suffix}.csv`, [
       row(['Producto', 'Categoría', 'Unidades vendidas']),
       ...topProducts.map(p => row([
         p.product_name ?? '—',
         p.category_label ?? p.category_slug ?? '—',
         p.units_sold ?? '—',
       ])),
-      '',
+    ])
 
-      // Por categoría
+    downloadCsv(`por-categoria-${suffix}.csv`, [
       row(['Categoría', 'Órdenes', 'Revenue']),
       ...byCategory.map(c => row([
         c.category_label ?? c.category_slug ?? '—',
         c.order_count ?? '—',
         c.total_revenue != null ? c.total_revenue : '—',
       ])),
-    ]
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `metricas-${periodLabel.replace(/\s/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+    ])
   }
 
   const pieData = ordersData?.by_status
