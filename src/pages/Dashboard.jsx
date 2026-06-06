@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react'
+import { Users, Package, ClipboardList, DollarSign } from 'lucide-react'
 import { COLORS } from '../constants/colors'
 import api from '../api/api'
 import ordersApi from '../api/ordersApi'
 import catalogApi from '../api/catalogApi'
+import OrderStatusBadge from '../components/Badges/OrderStatusBadge'
 import { common } from '../styles/common'
 import { dashboardStyles } from '../styles/dashboard'
 
 const STAT_CARDS = [
-  { key: 'users',    label: 'Usuarios registrados', icon: '👥', color: COLORS.info,    bg: COLORS.infoLight    },
-  { key: 'products', label: 'Productos activos',     icon: '📦', color: COLORS.success, bg: COLORS.successLight },
-  { key: 'orders',   label: 'Total de órdenes',      icon: '🧾', color: COLORS.warning, bg: COLORS.warningLight },
-  { key: 'revenue',  label: 'Ingresos totales',      icon: '💰', color: COLORS.primary, bg: COLORS.primaryLight },
+  { key: 'users',    label: 'Usuarios registrados', icon: <Users size={20} />,       color: COLORS.info,    bg: COLORS.infoLight    },
+  { key: 'products', label: 'Productos activos',     icon: <Package size={20} />,     color: COLORS.success, bg: COLORS.successLight },
+  { key: 'orders',   label: 'Total de órdenes',      icon: <ClipboardList size={20} />, color: COLORS.warning, bg: COLORS.warningLight },
+  { key: 'revenue',  label: 'Ingresos totales',      icon: <DollarSign size={20} />,  color: COLORS.primary, bg: COLORS.primaryLight },
 ]
 
 export default function Dashboard() {
@@ -105,7 +107,7 @@ export default function Dashboard() {
                     </td>
                     <td style={styles.td}>{order.user_id ?? order.buyer_id ?? '—'}</td>
                     <td style={styles.td}>
-                      <StatusBadge status={order.status} />
+                      <OrderStatusBadge status={order.status} />
                     </td>
                     <td style={styles.td}>
                       ${(order.total_amount ?? order.total ?? 0).toLocaleString('es-AR')}
@@ -124,22 +126,5 @@ export default function Dashboard() {
   )
 }
 
-function StatusBadge({ status }) {
-  const map = {
-    pending:        { label: 'Pendiente',     bg: COLORS.warningLight, color: COLORS.warning },
-    paid:           { label: 'Pagada',        bg: COLORS.successLight, color: COLORS.success  },
-    cancelled:      { label: 'Cancelada',     bg: COLORS.errorLight,   color: COLORS.error    },
-    delivered:      { label: 'Entregada',     bg: COLORS.infoLight,    color: COLORS.info     },
-    confirmed:      { label: 'Confirmada',    bg: COLORS.successLight, color: COLORS.success  },
-    shipped:        { label: 'Enviada',       bg: COLORS.infoLight,    color: COLORS.info     },
-    in_preparation: { label: 'En preparación',bg: COLORS.warningLight, color: COLORS.warning  },
-  }
-  const s = map[status] ?? { label: status ?? '—', bg: '#f1f5f9', color: COLORS.textSecondary }
-  return (
-    <span style={{ ...styles.badge, backgroundColor: s.bg, color: s.color }}>
-      {s.label}
-    </span>
-  )
-}
 
 const styles = { ...common, ...dashboardStyles }

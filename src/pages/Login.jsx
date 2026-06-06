@@ -1,23 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Store, AlertTriangle } from 'lucide-react'
 import api from '../api/api'
 import { loginStyles } from '../styles/login'
-
-/**
- * Decodifica el payload de un JWT sin verificar la firma para extraer el rol y
- * decidir si el usuario tiene acceso al panel antes de navegar.
- *
- * @param {string} token - JWT en formato header.payload.signature (base64url).
- * @returns {{ sub: string, role: string } | null} Payload decodificado, o null si el token es inválido.
- */
-function parseJwtPayload(token) {
-  try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    return JSON.parse(atob(base64))
-  } catch {
-    return null
-  }
-}
+import { parseJwtPayload } from '../utils/jwt'
 
 /**
  * Página de inicio de sesión del panel de administración.
@@ -89,7 +75,7 @@ export default function Login() {
     <div style={styles.page}>
       <div style={styles.card}>
         <div style={styles.logoArea}>
-          <span style={styles.logoIcon}>🏪</span>
+          <span style={styles.logoIcon}><Store size={28} /></span>
           <div>
             <div style={styles.logoTitle}>BAZAAR</div>
             <div style={styles.logoSub}>Panel de Administración</div>
@@ -100,7 +86,7 @@ export default function Login() {
 
         {error && (
           <div style={styles.errorBox}>
-            <span style={styles.errorIcon}>⚠️</span> {error}
+            <AlertTriangle size={14} style={{ marginRight: 6, flexShrink: 0 }} /> {error}
           </div>
         )}
 

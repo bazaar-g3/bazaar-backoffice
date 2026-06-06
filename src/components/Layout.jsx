@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import { LayoutDashboard, Users, Package, ClipboardList, TrendingUp, LogOut, Store } from 'lucide-react'
 import { COLORS } from '../constants/colors'
 
 /**
@@ -8,11 +9,11 @@ import { COLORS } from '../constants/colors'
  * @type {Array<{ path: string, label: string, icon: string }>}
  */
 const NAV_ITEMS = [
-  { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { path: '/users', label: 'Usuarios', icon: '👥' },
-  { path: '/products', label: 'Productos', icon: '📦' },
-  { path: '/orders', label: 'Órdenes', icon: '🧾' },
-  { path: '/metrics', label: 'Métricas', icon: '📈' },
+  { path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} /> },
+  { path: '/users', label: 'Usuarios', icon: <Users size={16} /> },
+  { path: '/products', label: 'Productos', icon: <Package size={16} /> },
+  { path: '/orders', label: 'Órdenes', icon: <ClipboardList size={16} /> },
+  { path: '/metrics', label: 'Métricas', icon: <TrendingUp size={16} /> },
 ]
 
 /**
@@ -48,7 +49,7 @@ export default function Layout({ children }) {
       <aside style={styles.sidebar}>
         {/* Logo */}
         <div style={styles.logoArea}>
-          <span style={styles.logoIcon}>🗂️</span>
+          <Store size={30} color={COLORS.white} style={{ flexShrink: 0 }} />
           <div>
             <div style={styles.logoTitle}>BAZAAR</div>
             <div style={styles.logoSub}>Backoffice Admin</div>
@@ -75,7 +76,7 @@ export default function Layout({ children }) {
 
         {/* Logout */}
         <button style={styles.logoutBtn} onClick={handleLogout}>
-          <span>🚪</span>
+          <LogOut size={16} />
           <span>Cerrar sesión</span>
         </button>
       </aside>
@@ -105,14 +106,12 @@ const styles = {
   },
   logoArea: {
     display: 'flex',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     padding: '24px 20px 20px',
     borderBottom: '1px solid #1e293b',
     marginBottom: 12,
-  },
-  logoIcon: {
-    fontSize: 28,
   },
   logoTitle: {
     fontSize: 16,

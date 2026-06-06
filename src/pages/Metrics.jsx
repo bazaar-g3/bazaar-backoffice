@@ -3,23 +3,13 @@ import {
   PieChart, Pie, Cell, Tooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from 'recharts'
+import { Users, ClipboardList, DollarSign, CheckCircle } from 'lucide-react'
 import { COLORS } from '../constants/colors'
+import { ORDER_STATUS_CONFIG } from '../constants/statusLabels'
 import api from '../api/api'
 import ordersApi from '../api/ordersApi'
 import { common } from '../styles/common'
 import { metricsStyles } from '../styles/metrics'
-
-const STATUS_LABELS = {
-  pending_payment: 'Pago pendiente',
-  confirmed: 'Confirmada',
-  in_preparation: 'En preparación',
-  shipped: 'Enviada',
-  delivered: 'Entregada',
-  payment_rejected: 'Pago rechazado',
-  cancelled: 'Cancelada',
-  refund_in_progress: 'Reembolso en proceso',
-  refund_processed: 'Reembolsada',
-}
 
 const PIE_COLORS = [
   COLORS.primary, COLORS.secondary, COLORS.info, COLORS.success,
@@ -97,12 +87,10 @@ export default function Metrics() {
   }
 
   /**
-   * Genera y descarga un archivo CSV con todos los datos del panel de métricas
-   * para el período activo.
+   * Genera y descarga un CSV por sección de métricas para el período activo.
    *
-   * El CSV incluye cinco secciones separadas por una línea en blanco:
-   * resumen general, órdenes por estado, evolución diaria, top productos y métricas
-   * por categoría. 
+   * Descarga cinco archivos separados: resumen general, órdenes por estado,
+   * evolución diaria, top productos y métricas por categoría.
    *
    * Si no hay período seleccionado, actualiza `exportError` con un mensaje
    * y cancela la exportación.
@@ -115,65 +103,66 @@ export default function Metrics() {
     setExportError(null)
 
     const periodLabel = `Últimos ${period} días`
+    const dateStr = new Date().toISOString().slice(0, 10)
+    const suffix = `${periodLabel.replace(/\s/g, '-')}-${dateStr}`
     const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`
     const row = cols => cols.map(escape).join(',')
 
-    const lines = [
-      // Resumen general
+    function downloadCsv(filename, lines) {
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(url)
+    }
+
+    downloadCsv(`resumen-${suffix}.csv`, [
       row(['Período', 'Usuarios nuevos', 'Órdenes totales', 'Revenue', 'Órdenes entregadas']),
       row([
         periodLabel,
         usersData?.new_users ?? '—',
         ordersData?.total ?? '—',
-        revenueData?.total_revenue != null
-          ? revenueData.total_revenue
-          : '—',
+        revenueData?.total_revenue != null ? revenueData.total_revenue : '—',
         ordersData?.by_status?.delivered ?? '—',
       ]),
-      '',
+    ])
 
-      // Órdenes por estado
+    downloadCsv(`ordenes-por-estado-${suffix}.csv`, [
       row(['Estado', 'Cantidad']),
       ...Object.entries(ordersData?.by_status ?? {})
-        .map(([key, qty]) => row([STATUS_LABELS[key] ?? key, qty])),
-      '',
+        .map(([key, qty]) => row([ORDER_STATUS_CONFIG[key]?.label ?? key, qty])),
+    ])
 
-      // Evolución diaria
+    downloadCsv(`evolucion-diaria-${suffix}.csv`, [
       row(['Fecha', 'Órdenes']),
       ...(ordersData?.daily ?? []).map(d => row([d.date, d.count])),
-      '',
+    ])
 
-      // Top productos
+    downloadCsv(`top-productos-${suffix}.csv`, [
       row(['Producto', 'Categoría', 'Unidades vendidas']),
       ...topProducts.map(p => row([
         p.product_name ?? '—',
         p.category_label ?? p.category_slug ?? '—',
         p.units_sold ?? '—',
       ])),
-      '',
+    ])
 
-      // Por categoría
+    downloadCsv(`por-categoria-${suffix}.csv`, [
       row(['Categoría', 'Órdenes', 'Revenue']),
       ...byCategory.map(c => row([
         c.category_label ?? c.category_slug ?? '—',
         c.order_count ?? '—',
         c.total_revenue != null ? c.total_revenue : '—',
       ])),
-    ]
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `metricas-${periodLabel.replace(/\s/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+    ])
   }
 
   const pieData = ordersData?.by_status
     ? Object.entries(ordersData.by_status)
       .filter(([, v]) => v > 0)
-      .map(([key, value]) => ({ name: STATUS_LABELS[key] ?? key, value }))
+      .map(([key, value]) => ({ name: ORDER_STATUS_CONFIG[key]?.label ?? key, value }))
     : []
 
   const lineData = ordersData?.daily ?? []
@@ -182,7 +171,7 @@ export default function Metrics() {
     {
       key: 'new_users',
       label: 'Usuarios nuevos',
-      icon: '👥',
+      icon: <Users size={20} />,
       color: COLORS.info,
       bg: COLORS.infoLight,
       value: usersData?.new_users ?? '—',
@@ -190,7 +179,7 @@ export default function Metrics() {
     {
       key: 'total_orders',
       label: 'Órdenes totales',
-      icon: '🧾',
+      icon: <ClipboardList size={20} />,
       color: COLORS.warning,
       bg: COLORS.warningLight,
       value: ordersData?.total ?? '—',
@@ -198,7 +187,7 @@ export default function Metrics() {
     {
       key: 'revenue',
       label: 'Revenue del período',
-      icon: '💰',
+      icon: <DollarSign size={20} />,
       color: COLORS.primary,
       bg: COLORS.primaryLight,
       value: revenueData?.total_revenue != null
@@ -208,7 +197,7 @@ export default function Metrics() {
     {
       key: 'delivered',
       label: 'Órdenes entregadas',
-      icon: '✅',
+      icon: <CheckCircle size={20} />,
       color: COLORS.success,
       bg: COLORS.successLight,
       value: ordersData?.by_status?.delivered ?? '—',
