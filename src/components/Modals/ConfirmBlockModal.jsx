@@ -34,7 +34,13 @@ export default function ConfirmBlockModal({ user, onConfirm, onCancel }) {
             Cancelar
           </button>
           <button
-            style={{ ...styles.confirmBtn, display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{
+              ...styles.confirmBtn,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center', // ◄ Esto centra el contenido horizontalmente
+              gap: 6
+            }}
             onClick={onConfirm}
           >
             <Ban size={14} /> Bloquear
